@@ -138,7 +138,20 @@ tr.total td{font-weight:600;border-top:2px solid var(--ink);background:var(--fie
 .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 @media (max-width:480px){.fields{grid-template-columns:minmax(0,1fr)}}
 .field{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted)}
-.field input,.field textarea,.field select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%}
+.field input,.field textarea,.field select{font:inherit;font-size:16px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0;max-width:100%}
+/* iOS gives date inputs a large intrinsic size and centered text; flatten it to match the other fields */
+.field input[type=datetime-local]{-webkit-appearance:none;appearance:none;height:42px;line-height:22px;text-align:left;display:block}
+.field input[type=datetime-local]::-webkit-date-and-time-value{text-align:left;margin:0}
+.field input[type=datetime-local]::-webkit-datetime-edit{padding:0}
+
+/* passenger manifest */
+.mf{display:flex;flex-direction:column;gap:10px}
+.mf-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;border-top:1px dashed var(--line);padding-top:10px}
+.mf-row:first-child{border-top:0;padding-top:0}
+.mf-head{grid-column:1/-1;display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-weight:600;font-size:.9rem}
+.mf-head .num{font-weight:400;font-size:.8rem;color:var(--muted)}
+.mf-head .num.bad{color:var(--bad);font-weight:600}
+@media (max-width:480px){.mf-row{grid-template-columns:minmax(0,1fr)}}
 .field textarea{min-height:64px;resize:vertical}
 .field.wide{grid-column:1/-1}
 
@@ -230,6 +243,11 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
           <label class="field wide">Notes<textarea id="notes" placeholder="Route, purpose, ballast, etc."></textarea></label>
         </div>
       </section>
+
+      <section class="panel">
+        <div class="panel-h"><h2>Passenger manifest</h2><button class="btn small" id="mfClear" type="button">Clear names</button></div>
+        <div class="mf" id="manifest"></div>
+      </section>
     </div>
 
     <div class="col">
@@ -251,12 +269,9 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
         <div class="tbl-wrap"><table id="table"></table></div>
       </section>
       <section class="panel">
-        <h2>Print or send</h2>
+        <h2>Send</h2>
         <div class="actions" id="actions">
-          <button class="btn primary" id="btnPdf" type="button">Save PDF</button>
-          <button class="btn" id="btnShare" type="button" hidden>Share / email PDF</button>
-          <button class="btn" id="btnPrint" type="button" hidden>Print</button>
-          <button class="btn" id="btnCopy" type="button">Copy summary text</button>
+          <button class="btn primary" id="btnSend" type="button" style="flex:1 1 100%">Send W&amp;B (PDF)</button>
         </div>
         <div class="msg" id="actMsg"></div>
       </section>
@@ -347,9 +362,11 @@ const MODELS = {
 
 /* Default fleet: empty-weight moments as recorded in the worksheets. */
 const DEFAULT_FLEET = [
-  { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2 },
-  { id: "N7187K", tail: "N7187K", model: "R22", bew: 895.2,  arm: 92706 / 895.2,   lat: -354 / 895.2 }
+  { id: "N7187K", tail: "N7187K", model: "R22", bew: 895.2,  arm: 92706 / 895.2,   lat: -354 / 895.2 },
+  { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2 }
 ];
+// R22s before R44s, then by tail number
+const fleetOrder = (a, b) => a.model.localeCompare(b.model) || a.tail.localeCompare(b.tail);
 
 /* ---------- storage (per device; optional) ---------- */
 const store = {
@@ -363,7 +380,7 @@ const S = {
   loads: store.get("loads", {}),
   pilot: store.get("pilot", "")
 };
-if (!S.fleet.find(a => a.id === S.tailId)) S.tailId = S.fleet[0] && S.fleet[0].id;
+if (!S.fleet.find(a => a.id === S.tailId)) S.tailId = S.fleet.slice().sort(fleetOrder)[0].id;
 
 const $ = id => document.getElementById(id);
 const fmt = (n, d = 1) => (Number.isFinite(n) ? n.toFixed(d) : "–");
@@ -373,12 +390,24 @@ const model = () => MODELS[ac().model];
 
 function freshLoad(m) {
   const st = {}; m.stations.forEach(s => st[s.key] = s.def || 0);
-  return { st, rm: {}, main: m.main.usable, auxAuto: true, aux: m.aux.usable };
+  return { st, rm: {}, main: m.main.usable, auxAuto: true, aux: m.aux.usable, mf: {} };
 }
 function load() {
   const a = ac(), m = model();
   if (!S.loads[a.id]) S.loads[a.id] = freshLoad(m);
+  if (!S.loads[a.id].mf) S.loads[a.id].mf = {};
   return S.loads[a.id];
+}
+const pilotSeat = m => m.stations.find(s => s.key === "pilot").seat;
+// one manifest line per seat: occupant and under-seat baggage weights come from the loading section
+function manifestRows() {
+  const m = model(), L = load(), ps = pilotSeat(m);
+  return Object.keys(m.seats).map(k => {
+    const sts = m.stations.filter(s => s.seat === k);
+    const person = num(L.st[(sts.find(s => !s.bag) || {}).key]), bag = num(L.st[(sts.find(s => s.bag) || {}).key]);
+    const e = L.mf[k] || {};
+    return { seat: k, label: m.seats[k], pic: k === ps, name: k === ps ? S.pilot : (e.name || ""), contact: e.contact || "", person, bag };
+  });
 }
 function saveState() { store.set("fleet", S.fleet); store.set("tail", S.tailId); store.set("loads", S.loads); store.set("pilot", S.pilot); }
 
@@ -512,7 +541,7 @@ function chartImage(o, W, H) {
 
 /* ---------- UI ---------- */
 function renderTails() {
-  $("tails").replaceChildren(...S.fleet.map(a => {
+  $("tails").replaceChildren(...S.fleet.slice().sort(fleetOrder).map(a => {
     const b = document.createElement("button"); b.type = "button"; b.className = "tail";
     b.setAttribute("aria-pressed", a.id === S.tailId); b.innerHTML = `${esc(a.tail)}<small>${a.model}</small>`;
     b.onclick = () => { S.tailId = a.id; saveState(); renderAll(); };
@@ -556,6 +585,33 @@ function renderRemovals() {
     return l;
   }));
 }
+function renderManifest() {
+  const L = load();
+  $("manifest").replaceChildren(...manifestRows().map(r => {
+    const d = document.createElement("div"); d.className = "mf-row";
+    d.innerHTML = `<div class="mf-head"><span>${r.label}${r.pic ? " · PIC" : ""}</span><span class="num" data-mfw="${r.seat}"></span></div>
+      <label class="field">Name<input id="mf_name_${r.seat}" autocomplete="off" value="${esc(r.name)}" placeholder="${r.pic ? "Pilot in command" : "Passenger name"}"></label>
+      <label class="field">Emergency contact<input id="mf_contact_${r.seat}" autocomplete="off" inputmode="tel" value="${esc(r.contact)}" placeholder="Name / phone (optional)"></label>`;
+    const [nameIn, contactIn] = d.querySelectorAll("input");
+    nameIn.addEventListener("input", () => {
+      if (r.pic) { S.pilot = nameIn.value; $("pilot").value = nameIn.value; }
+      else (L.mf[r.seat] = L.mf[r.seat] || {}).name = nameIn.value;
+      update();
+    });
+    contactIn.addEventListener("input", () => { (L.mf[r.seat] = L.mf[r.seat] || {}).contact = contactIn.value; saveState(); });
+    return d;
+  }));
+}
+function updateManifestWeights() {
+  manifestRows().forEach(r => {
+    const el = document.querySelector(`[data-mfw="${r.seat}"]`); if (!el) return;
+    const missing = r.name.trim() && !r.person;
+    el.textContent = missing ? "Enter weight in loading" : r.person ? `${fmt(r.person, 0)} lb${r.bag ? ` + ${fmt(r.bag, 0)} lb bag` : ""}` : "Empty";
+    el.classList.toggle("bad", !!missing);
+  });
+}
+$("mfClear").onclick = () => { load().mf = {}; renderManifest(); update(); };
+
 function renderFuel() {
   const m = model(), L = load();
   $("mainRange").max = m.main.usable; $("mainRange").value = L.main;
@@ -575,7 +631,11 @@ $("auxGal").addEventListener("blur", () => { $("auxGal").value = auxGal(model(),
 document.querySelectorAll("[data-aux]").forEach(b => b.onclick = () => { setAux(load().aux + +b.dataset.aux); $("auxGal").value = load().aux; });
 
 $("pilot").value = S.pilot;
-$("pilot").addEventListener("input", e => { S.pilot = e.target.value; saveState(); });
+$("pilot").addEventListener("input", e => {
+  S.pilot = e.target.value;
+  const mi = $("mf_name_" + pilotSeat(model())); if (mi) mi.value = S.pilot;
+  update();
+});
 function nowLocal() { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); }
 $("when").value = nowLocal();
 
@@ -596,6 +656,7 @@ function update() {
     const w = m.stations.filter(s => s.seat === el.dataset.seat).reduce((t, s) => t + num(load().st[s.key]), 0);
     el.textContent = w > m.seatMax ? `${fmt(w, 0)} lb on this seat; max ${m.seatMax} lb incl. baggage` : "";
   });
+  updateManifestWeights();
   $("checks").innerHTML = R.checks.map(c => `<li class="${c.ok ? "" : "bad"}"><span>${esc(c.text)}</span></li>`).join("");
   const tr = (r, cls = "") => `<tr class="${cls}"><td>${esc(r.label)}</td><td>${fmt(r.w)}</td><td>${fmt(r.arm, 2)}</td><td>${fmt(r.lat, 2)}</td><td>${fmt(r.lm, 0)}</td><td>${fmt(r.tm, 0)}</td></tr>`;
   const tot = (label, t) => tr({ label, w: t.w, arm: t.cg, lat: t.lcg, lm: t.lm, tm: t.tm }, "total");
@@ -604,7 +665,7 @@ function update() {
   paintCanvas($("chartLong"), chartOpts(m, R, "long"));
   paintCanvas($("chartLat"), chartOpts(m, R, "lat"));
 }
-function renderAll() { renderTails(); renderStations(); renderRemovals(); renderFuel(); renderFleet(); update(); }
+function renderAll() { renderTails(); renderStations(); renderRemovals(); renderFuel(); renderManifest(); renderFleet(); update(); }
 let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(update, 120); });
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", update);
 window.addEventListener("beforeprint", () => { printing = true; update(); });
@@ -677,11 +738,11 @@ async function copyText(t, msgEl, okMsg) {
     msgEl.replaceChildren("Copy didn't work here. Select the text below and copy it:", ta); ta.focus(); ta.select();
   }
 }
-$("btnCopy").onclick = () => copyText(summaryText(), $("actMsg"), "Summary copied. Paste it into an email or text.");
 
 function buildPdf() {
   const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: "pt", format: "letter" });
-  const a = ac(), m = model(), W = 612, M = 40; let y = M;
+  const a = ac(), m = model(), W = 612, H = 792, M = 40, BOTTOM = H - M - 52; let y = M;
+  const ensure = h => { if (y + h > BOTTOM) { doc.addPage(); y = M + 10; } };
   const when = new Date($("when").value || Date.now());
   doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text(`${a.tail} Weight & Balance`, M, y + 6);
   doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90);
@@ -698,16 +759,30 @@ function buildPdf() {
   hdr.forEach((h, i) => doc.text(h, cols[i], y, { align: i ? "right" : "left" }));
   y += 5; doc.setDrawColor(180); doc.line(M, y, W - M, y); y += 12; doc.setTextColor(20);
   const line = (r, bold) => {
-    doc.setFont("helvetica", bold ? "bold" : "normal");
+    ensure(14); doc.setFont("helvetica", bold ? "bold" : "normal");
     if (bold) { doc.setFillColor(242, 244, 246); doc.rect(M, y - 10, W - 2 * M, 14, "F"); }
     [r.label, fmt(r.w), fmt(r.arm, 2), fmt(r.lat, 2), fmt(r.lm, 0), fmt(r.tm, 0)].forEach((t, i) => doc.text(String(t), cols[i], y, { align: i ? "right" : "left" }));
     y += 14;
   };
   R.rows.forEach(r => line(r)); line({ label: "Zero usable fuel weight & CG", w: R.zf.w, arm: R.zf.cg, lat: R.zf.lcg, lm: R.zf.lm, tm: R.zf.tm }, true);
   R.fuelRows.forEach(r => line(r)); line({ label: "Takeoff gross weight & CG", w: R.to.w, arm: R.to.cg, lat: R.to.lcg, lm: R.to.lm, tm: R.to.tm }, true);
-  y += 6;
+  y += 10;
+  // passenger manifest
+  const mrows = manifestRows().filter(r => r.pic || r.name.trim() || r.person);
+  ensure(30 + mrows.length * 13);
+  doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(20); doc.text("Passenger manifest", M, y); y += 14;
+  const mc = [M + 2, 150, 330, 400, 455], mh = ["Seat", "Name", "Occupant lb", "Baggage lb", "Emergency contact"];
+  doc.setFontSize(8.5); doc.setTextColor(90); mh.forEach((h, i) => doc.text(h, mc[i], y, { align: i === 2 || i === 3 ? "right" : "left" }));
+  y += 5; doc.setDrawColor(180); doc.line(M, y, W - M, y); y += 11; doc.setTextColor(20); doc.setFont("helvetica", "normal");
+  mrows.forEach(r => {
+    const cells = [r.label + (r.pic ? " (PIC)" : ""), r.name.trim() || "—", r.person ? fmt(r.person, 0) : "—", r.bag ? fmt(r.bag, 0) : "—", r.contact.trim() || ""];
+    cells.forEach((t, i) => doc.text(doc.splitTextToSize(String(t), i === 1 ? 170 : i === 4 ? W - M - mc[4] : 110)[0], mc[i], y, { align: i === 2 || i === 3 ? "right" : "left" }));
+    y += 13;
+  });
+  y += 8;
   // charts side by side
   const cw = (W - 2 * M - 12) / 2, chL = cw / 1.25;
+  ensure(chL + 30);
   doc.addImage(chartImage(chartOpts(m, R, "long"), 400, 320), "JPEG", M, y, cw, chL);
   doc.addImage(chartImage(chartOpts(m, R, "lat"), 400, 320), "JPEG", M + cw + 12, y, cw, chL);
   doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(90);
@@ -715,13 +790,17 @@ function buildPdf() {
   doc.text("Lateral CG envelope  (+ = right side)", M + cw + 12, y + chL + 10);
   y += chL + 26;
   // checks
-  doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(20); doc.text("Limit checks", M, y); y += 14;
+  ensure(28); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(20); doc.text("Limit checks", M, y); y += 14;
   doc.setFontSize(9); doc.setFont("helvetica", "normal");
-  R.checks.forEach(c => { doc.setTextColor(...(c.ok ? [29, 122, 70] : [180, 35, 24])); doc.text(c.ok ? "OK" : "FAIL", M, y); doc.setTextColor(20); doc.text(c.text, M + 30, y); y += 13; });
+  R.checks.forEach(c => { ensure(13); doc.setTextColor(...(c.ok ? [29, 122, 70] : [180, 35, 24])); doc.text(c.ok ? "OK" : "FAIL", M, y); doc.setTextColor(20); doc.text(c.text, M + 30, y); y += 13; });
   const notes = $("notes").value.trim();
-  if (notes) { y += 4; doc.setFont("helvetica", "bold"); doc.text("Notes", M, y); y += 12; doc.setFont("helvetica", "normal"); doc.splitTextToSize(notes, W - 2 * M).forEach(t => { doc.text(t, M, y); y += 12; }); }
-  // signature + disclaimer pinned to bottom
-  const by = 792 - M - 30;
+  if (notes) { y += 4; ensure(26); doc.setFont("helvetica", "bold"); doc.text("Notes", M, y); y += 12; doc.setFont("helvetica", "normal"); doc.splitTextToSize(notes, W - 2 * M).forEach(t => { ensure(12); doc.text(t, M, y); y += 12; }); }
+  // page numbers when it runs long
+  const pages = doc.getNumberOfPages();
+  if (pages > 1) for (let p = 1; p <= pages; p++) { doc.setPage(p); doc.setFontSize(8); doc.setTextColor(120); doc.text(`${a.tail} W&B · page ${p} of ${pages}`, W - M, H - 20, { align: "right" }); }
+  doc.setPage(pages);
+  // signature + disclaimer pinned to bottom of the last page
+  const by = H - M - 30;
   doc.setDrawColor(120); doc.line(M, by, M + 240, by); doc.setFontSize(8); doc.setTextColor(90); doc.text("PIC signature", M, by + 10);
   doc.text(`Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&B record). Limits per Robinson ${a.model} POH.`, M, by + 24);
   doc.text("The pilot in command is responsible for verifying these results against the aircraft's POH.", M, by + 34);
@@ -729,46 +808,32 @@ function buildPdf() {
 }
 const pdfName = () => `${ac().tail}_WB_${($("when").value || nowLocal()).replace(/[:T]/g, "-")}.pdf`;
 
+// Send: phone share sheet when hosted (Mail, Messages, Print…); inside claude.ai the viewer's save/share prompt; otherwise a download.
 let downloads = null, inViewer = !!(window.claude && window.claude.use);
-async function onPdf() {
+if (inViewer) window.claude.use("downloads").then(d => { downloads = d; }, () => {});
+async function onSend() {
   const msg = $("actMsg");
-  if (!window.jspdf) { msg.textContent = "The PDF tool didn't load. Check your connection and reload."; return; }
-  const doc = buildPdf();
+  if (!window.jspdf) { msg.textContent = "The PDF tool didn't load. Connect once and reopen the app."; return; }
+  const blob = buildPdf().output("blob"), name = pdfName();
+  if (!inViewer) {
+    const file = new File([blob], name, { type: "application/pdf" });
+    let canShare = false; try { canShare = !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) {}
+    if (canShare) {
+      try { await navigator.share({ files: [file], title: `${ac().tail} weight & balance`, text: summaryText().split("\n").slice(0, 3).join("\n") }); msg.textContent = "Sent."; }
+      catch (e) { msg.textContent = e && e.name === "AbortError" ? "" : "Couldn't open the share sheet. Try again."; }
+      return;
+    }
+  }
   if (downloads) {
-    try { await downloads.save({ filename: pdfName(), data: doc.output("blob") }); msg.textContent = "PDF saved. Open it from your files to print or email it."; }
-    catch (e) { msg.textContent = e && e.code === "declined" ? "Save cancelled." : "Couldn't save the PDF here. Use Copy summary text instead."; }
+    try { await downloads.save({ filename: name, data: blob }); msg.textContent = "PDF ready. Pick Mail or Print from the share options, or open it from your files."; }
+    catch (e) { msg.textContent = e && e.code === "declined" ? "" : "Couldn't send from here. Open the hosted app to send the PDF."; }
     return;
   }
-  const url = URL.createObjectURL(doc.output("blob")); const a = document.createElement("a"); a.href = url; a.download = pdfName(); document.body.append(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000); msg.textContent = "PDF downloaded.";
+  if (inViewer) { msg.textContent = "Sending isn't available in this view. Open the hosted app to send the PDF."; return; }
+  const url = URL.createObjectURL(blob), a = document.createElement("a"); a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000); msg.textContent = "PDF downloaded. Attach it to an email to send it.";
 }
-async function onShare() {
-  const msg = $("actMsg"); if (!window.jspdf) { msg.textContent = "The PDF tool didn't load. Check your connection and reload."; return; }
-  const file = new File([buildPdf().output("blob")], pdfName(), { type: "application/pdf" });
-  try { await navigator.share({ files: [file], title: `${ac().tail} weight & balance`, text: summaryText().split("\n").slice(0, 3).join("\n") }); msg.textContent = "Shared."; }
-  catch (e) { if (e && e.name !== "AbortError") msg.textContent = "Sharing isn't available here. Use Save PDF instead."; }
-}
-$("btnPdf").onclick = onPdf;
-$("btnShare").onclick = onShare;
-$("btnPrint").onclick = () => window.print();
-
-(async () => {
-  if (inViewer) {
-    try { downloads = await window.claude.use("downloads"); } catch (e) { downloads = null; }
-    if (!downloads) $("btnPdf").hidden = true;
-  } else {
-    // standalone hosting: native print and share sheet are available
-    $("btnPrint").hidden = false;
-    try {
-      const probe = new File(["x"], "x.pdf", { type: "application/pdf" });
-      if (navigator.canShare && navigator.canShare({ files: [probe] })) {
-        $("btnShare").hidden = false; $("btnShare").classList.add("primary"); $("btnPdf").classList.remove("primary");
-        $("actions").prepend($("btnShare"));
-      }
-    } catch (e) {}
-    $("btnPdf").textContent = "Download PDF";
-  }
-})();
+$("btnSend").onclick = onSend;
 
 renderAll();
 </script>
