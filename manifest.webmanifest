@@ -1,0 +1,14 @@
+{
+  "name": "Robinson Weight & Balance",
+  "short_name": "R22/R44 W&B",
+  "description": "Weight & balance for Robinson R22 Beta II and R44 Raven I with CG envelope charts.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0e141a",
+  "theme_color": "#1f5f8b",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

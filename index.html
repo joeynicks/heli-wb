@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f5f8b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</head>
+<body><title>Robinson Weight &amp; Balance</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="R22/R44 W&amp;B">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+/* Layout: sticky status strip over a two-column cockpit (loading left, envelope charts right); one column on phones. */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#15202b; --muted:#5b6b7a; --line:#d5dce3; --field:#f6f8fa;
+  --accent:#1f5f8b; --accent-ink:#ffffff; --env:#1f5f8b; --env-fill:rgba(31,95,139,.08);
+  --ok:#1d7a46; --ok-bg:#e3f3e9; --bad:#b42318; --bad-bg:#fdecea; --warn:#9a5b00;
+  --display:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e141a; --panel:#17212b; --ink:#e6edf3; --muted:#93a4b4; --line:#2a3846; --field:#1d2935;
+  --accent:#5aa9dd; --accent-ink:#0b1a26; --env:#6fb6e6; --env-fill:rgba(111,182,230,.10);
+  --ok:#4cc38a; --ok-bg:#12301f; --bad:#ff7b72; --bad-bg:#3a1513; --warn:#e3b341; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141a; --panel:#17212b; --ink:#e6edf3; --muted:#93a4b4; --line:#2a3846; --field:#1d2935;
+  --accent:#5aa9dd; --accent-ink:#0b1a26; --env:#6fb6e6; --env-fill:rgba(111,182,230,.10);
+  --ok:#4cc38a; --ok-bg:#12301f; --bad:#ff7b72; --bad-bg:#3a1513; --warn:#e3b341; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 40px}
+h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1{font-size:1.6rem;line-height:1.1}
+h2{font-size:1.15rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* top bar */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;justify-content:space-between}
+.top .sub{color:var(--muted);font-size:.85rem}
+.tails{display:flex;gap:8px;flex-wrap:wrap}
+.tail{border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:7px 14px;font:600 1rem var(--display);letter-spacing:.04em;cursor:pointer}
+.tail small{font:500 .75rem var(--body);color:var(--muted);margin-left:6px;letter-spacing:0}
+.tail[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tail[aria-pressed="true"] small{color:inherit;opacity:.8}
+
+/* status strip */
+.status{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;margin:12px 0 16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);display:grid;grid-template-columns:auto 1fr;gap:0;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.verdict{display:flex;align-items:center;justify-content:center;padding:10px 16px;font:700 1.15rem var(--display);letter-spacing:.08em;text-transform:uppercase;min-width:132px;text-align:center;line-height:1.05}
+.verdict.ok{background:var(--ok-bg);color:var(--ok)}
+.verdict.bad{background:var(--bad-bg);color:var(--bad)}
+.readouts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 12px;padding:8px 14px;align-items:center}
+.ro b{display:block;font:500 .68rem var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.ro span{font-family:var(--mono);font-size:1rem;font-variant-numeric:tabular-nums}
+@media (max-width:560px){.readouts{grid-template-columns:repeat(2,minmax(0,1fr))}.verdict{min-width:96px;font-size:1rem;padding:8px 10px}}
+
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:16px;align-items:start}
+@media (max-width:880px){.grid{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 14px 16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.hint{color:var(--muted);font-size:.8rem}
+
+/* station rows */
+.rows{display:flex;flex-direction:column;gap:8px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
+.row label{font-weight:500;font-size:.92rem}
+.row label .arm{display:block;color:var(--muted);font:400 .72rem var(--mono)}
+.stepper{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--field)}
+.stepper button{width:38px;border:0;background:transparent;color:var(--accent);font:600 1.2rem var(--body);cursor:pointer}
+.stepper button:active{background:var(--line)}
+.stepper input{width:76px;border:0;border-inline:1px solid var(--line);background:var(--panel);color:var(--ink);text-align:center;font:500 1.05rem var(--mono);padding:8px 2px;-moz-appearance:textfield}
+.stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.unit{font:400 .72rem var(--body);color:var(--muted);align-self:center;padding-right:2px}
+.seatgroup{border-top:1px dashed var(--line);padding-top:8px}
+.seatgroup:first-child{border-top:0;padding-top:0}
+.seatwarn{color:var(--bad);font-size:.78rem;font-weight:600}
+
+/* fuel */
+.fuel{display:flex;flex-direction:column;gap:10px}
+.fuelline{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
+input[type=range]{width:100%;accent-color:var(--accent);height:28px}
+.gauge{display:flex;gap:16px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
+.gauge .num{color:var(--ink)}
+.toggle{display:flex;gap:8px;align-items:center;font-size:.88rem;cursor:pointer}
+.toggle input{width:20px;height:20px;accent-color:var(--accent)}
+
+/* removals */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:var(--field);font-size:.86rem;cursor:pointer;user-select:none}
+.chip input{width:18px;height:18px;accent-color:var(--accent);margin:0}
+.chip .num{color:var(--muted);font-size:.72rem}
+
+/* charts */
+.chart{width:100%;display:block;aspect-ratio:1.25/1;max-width:100%}
+.chart.lat{aspect-ratio:1.9/1}
+@media (max-width:560px){.chart.lat{aspect-ratio:1.45/1}}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.legend .to{background:var(--ink)}
+.legend .zf{border:2px solid var(--ink)}
+
+/* checks */
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.checks li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:6px;font-size:.88rem;align-items:start}
+.checks li::before{content:"✓";font-weight:700;color:var(--ok);text-align:center}
+.checks li.bad::before{content:"✕";color:var(--bad)}
+.checks li.bad{color:var(--bad);font-weight:500}
+.checks .num{font-size:.82rem}
+
+/* table */
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.82rem}
+th,td{padding:6px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left;white-space:normal}
+th{font:500 .68rem var(--body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+td{font-family:var(--mono);font-variant-numeric:tabular-nums}
+td:first-child{font-family:var(--body)}
+tr.total td{font-weight:600;border-top:2px solid var(--ink);background:var(--field)}
+
+/* form fields */
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:480px){.fields{grid-template-columns:minmax(0,1fr)}}
+.field{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted)}
+.field input,.field textarea,.field select{font:inherit;font-size:.95rem;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%}
+.field textarea{min-height:64px;resize:vertical}
+.field.wide{grid-column:1/-1}
+
+/* buttons */
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.btn{font:600 .95rem var(--body);border-radius:8px;padding:11px 16px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.small{padding:7px 11px;font-size:.84rem}
+.btn.danger{color:var(--bad)}
+.btn:focus-visible,.tail:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.stepper button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.msg{font-size:.85rem;color:var(--muted);min-height:1.2em}
+
+/* fleet editor */
+.fleet{display:flex;flex-direction:column;gap:12px}
+.ac{border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) auto;gap:8px;align-items:end;background:var(--field)}
+.ac .field input,.ac .field select{background:var(--panel)}
+@media (max-width:700px){.ac{grid-template-columns:repeat(2,minmax(0,1fr))}.ac .del{grid-column:1/-1}}
+details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);list-style-position:inside}
+.foot{color:var(--muted);font-size:.78rem;margin-top:18px;max-width:75ch}
+
+@media print{
+  :root:root:root{--bg:#fff;--panel:#fff;--ink:#000;--muted:#444;--line:#bbb;--field:#f3f3f3;--ok:#1d7a46;--ok-bg:#e3f3e9;--bad:#b42318;--bad-bg:#fdecea;color-scheme:light}
+  body::before,.tails,.actions,.no-print,details,.stepper button,.legend,.hint{display:none!important}
+  .wrap{padding-block:0;max-width:none}
+  .status{position:static;box-shadow:none;margin:6px 0 10px}
+  .panel{break-inside:avoid;padding:8px 10px;gap:6px}
+  .grid,.col{gap:8px}
+  .grid{grid-template-columns:1fr 1fr}
+  .stepper,.stepper input,.field input,.field textarea{border:0;background:none}
+  input[type=range],.toggle,#auxManual{display:none!important}
+  .foot{margin-top:8px}
+}
+@page{margin:12mm}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1 id="title">Robinson Weight &amp; Balance</h1>
+      <div class="sub" id="subtitle">Pick an aircraft, enter loads, check the envelope.</div>
+    </div>
+    <div class="tails" id="tails" role="group" aria-label="Aircraft"></div>
+  </header>
+
+  <div class="status" id="status" aria-live="polite">
+    <div class="verdict ok" id="verdict">Within limits</div>
+    <div class="readouts">
+      <div class="ro"><b>Takeoff wt</b><span id="roW">–</span></div>
+      <div class="ro"><b>Long. CG</b><span id="roCG">–</span></div>
+      <div class="ro"><b>Lat. CG</b><span id="roLat">–</span></div>
+      <div class="ro"><b>Margin to max</b><span id="roMargin">–</span></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel">
+        <div class="panel-h"><h2>Occupants &amp; baggage</h2><span class="hint" id="seatHint"></span></div>
+        <div class="rows" id="stations"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-h"><h2>Fuel</h2><span class="hint">6.0 lb/gal</span></div>
+        <div class="fuel">
+          <div class="fuelline">
+            <input type="range" id="mainRange" min="0" step="0.5" aria-label="Main fuel gallons">
+            <div class="stepper"><button type="button" data-fuel="-1" aria-label="Less main fuel">−</button><input id="mainGal" type="number" inputmode="decimal" step="0.1" min="0" aria-label="Main fuel gallons"><button type="button" data-fuel="1" aria-label="More main fuel">+</button></div>
+          </div>
+          <label class="toggle"><input type="checkbox" id="auxAuto" checked> Aux fuel follows main (interconnected tanks)</label>
+          <div class="fuelline" id="auxManual" hidden>
+            <span class="hint">Aux gallons</span>
+            <div class="stepper"><button type="button" data-aux="-1" aria-label="Less aux fuel">−</button><input id="auxGal" type="number" inputmode="decimal" step="0.1" min="0" aria-label="Aux fuel gallons"><button type="button" data-aux="1" aria-label="More aux fuel">+</button></div>
+          </div>
+          <div class="gauge" id="fuelGauge"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-h"><h2>Removed items</h2><span class="hint">Tick what's off the aircraft</span></div>
+        <div class="chips" id="removals"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Flight details</h2>
+        <div class="fields">
+          <label class="field">Pilot in command<input id="pilot" autocomplete="name" placeholder="Name"></label>
+          <label class="field">Date / time<input id="when" type="datetime-local"></label>
+          <label class="field wide">Notes<textarea id="notes" placeholder="Route, purpose, ballast, etc."></textarea></label>
+        </div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel">
+        <div class="panel-h"><h2>Longitudinal CG envelope</h2></div>
+        <canvas class="chart" id="chartLong" role="img" aria-label="Gross weight versus longitudinal CG chart"></canvas>
+        <div class="legend"><span><i class="to"></i>Takeoff</span><span><i class="zf"></i>Zero usable fuel</span><span>Line = fuel burn</span></div>
+      </section>
+      <section class="panel">
+        <div class="panel-h"><h2>Lateral CG envelope</h2><span class="hint">+ = right side</span></div>
+        <canvas class="chart lat" id="chartLat" role="img" aria-label="Lateral CG versus longitudinal CG chart"></canvas>
+      </section>
+      <section class="panel">
+        <h2>Limit checks</h2>
+        <ul class="checks" id="checks"></ul>
+      </section>
+      <section class="panel">
+        <h2>Loading summary</h2>
+        <div class="tbl-wrap"><table id="table"></table></div>
+      </section>
+      <section class="panel">
+        <h2>Print or send</h2>
+        <div class="actions" id="actions">
+          <button class="btn primary" id="btnPdf" type="button">Save PDF</button>
+          <button class="btn" id="btnShare" type="button" hidden>Share / email PDF</button>
+          <button class="btn" id="btnPrint" type="button" hidden>Print</button>
+          <button class="btn" id="btnCopy" type="button">Copy summary text</button>
+        </div>
+        <div class="msg" id="actMsg"></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel no-print" style="margin-top:16px">
+    <details id="fleetBox">
+      <summary>Fleet &amp; empty weights</summary>
+      <div class="fleet" style="margin-top:12px">
+        <p class="hint" style="margin:0">Enter values from each aircraft's current weight &amp; balance record. Changes are saved on this device only.</p>
+        <div id="fleetList" class="fleet"></div>
+        <div class="actions">
+          <button class="btn small" id="addR22" type="button">Add R22</button>
+          <button class="btn small" id="addR44" type="button">Add R44</button>
+          <button class="btn small" id="exportFleet" type="button">Copy fleet code</button>
+          <button class="btn small" id="importFleet" type="button">Load fleet code</button>
+          <button class="btn small danger" id="resetFleet" type="button">Reset to defaults</button>
+        </div>
+        <div id="importBox" hidden class="field">Paste fleet code<textarea id="importText"></textarea><div class="actions"><button class="btn small primary" id="importGo" type="button">Load</button><button class="btn small" id="importCancel" type="button">Cancel</button></div></div>
+        <div class="msg" id="fleetMsg"></div>
+      </div>
+    </details>
+  </section>
+
+  <p class="foot">Limits and arms are from the Robinson R22 and R44 Pilot's Operating Handbooks (Sections 2 and 6, rev. 2014–2015). Empty weight and CG come from each aircraft's own weight &amp; balance record. The pilot in command is responsible for verifying these results against the aircraft's POH.</p>
+</div>
+
+<script>
+"use strict";
+/* ---------- aircraft models (POH data) ---------- */
+const MODELS = {
+  R22: {
+    name: "R22 Beta II", maxGross: 1370, minGross: 920, seatMax: 240, bagMax: 50, fuelLb: 6,
+    main: { usable: 16.9, arm: 108.6, lat: -11.0 },
+    aux:  { usable: 9.4,  arm: 103.8, lat: 11.2 },
+    // aux gallons vs main gallons, from the N7187K worksheet table
+    auxTable: [[3.5,0],[4,0.2],[5,1],[6,1.7],[7,2.4],[8,3],[9,3.7],[10,4.3],[11,5],[12,5.7],[13,6.3],[14,7],[15,7.7],[16,8.4],[16.9,9.4]],
+    stations: [
+      { key: "pilot", label: "Pilot (right seat)", arm: 78.0, lat: 10.7, seat: "R", def: 170 },
+      { key: "bagR",  label: "Baggage under right seat", arm: 78.0, lat: 10.7, seat: "R", bag: true },
+      { key: "pax",   label: "Passenger (left seat)", arm: 78.0, lat: -9.3, seat: "L" },
+      { key: "bagL",  label: "Baggage under left seat", arm: 78.0, lat: -9.3, seat: "L", bag: true }
+    ],
+    seats: { R: "Right seat", L: "Left seat" },
+    removals: [
+      { key: "doorR", label: "Right door", w: 5.2, arm: 77.5, lat: 21.0 },
+      { key: "doorL", label: "Left door", w: 5.2, arm: 77.5, lat: -21.0 },
+      { key: "cyc",   label: "Left cyclic", w: 0.8, arm: 68.0, lat: -8.0 },
+      { key: "coll",  label: "Left collective", w: 1.0, arm: 80.7, lat: -19.5 },
+      { key: "ped",   label: "Left pedals", w: 0.8, arm: 46.5, lat: -9.5 }
+    ],
+    envLong: [[95.5,920],[95.5,1275],[96.5,1370],[100.0,1370],[102.0,1175],[102.0,920]],
+    envLat:  [[95.5,-0.8],[95.5,1.0],[98.0,2.6],[102.0,1.2],[102.0,-0.5],[98.0,-2.2],[97.0,-2.2]],
+    axes: { x: [95,103,1], y: [900,1400,100], lat: [-3,3,1] }
+  },
+  R44: {
+    name: "R44 Raven I", maxGross: 2400, minGross: 1550, seatMax: 300, bagMax: 50, fuelLb: 6,
+    main: { usable: 29.5, arm: 106.0, lat: -13.5 },
+    aux:  { usable: 17.0, arm: 102.0, lat: 13.0 },
+    // aux gallons vs main gallons, from the N931QA worksheet table
+    auxTable: [[7,0],[8,0.8],[9,1.5],[10,2.3],[11,3],[12,3.8],[13,4.5],[14,5.3],[15,6],[16,6.8],[17,7.6],[18,8.3],[19,9.1],[20,9.8],[21,10.6],[22,11.3],[23,12.1],[24,12.8],[25,13.6],[26,14.4],[27,15.1],[28,15.9],[29,16.7],[29.5,17]],
+    stations: [
+      { key: "pilot", label: "Pilot (front right)", arm: 49.5, lat: 12.2, seat: "FR", def: 175 },
+      { key: "bagFR", label: "Baggage under front right", arm: 44.0, lat: 11.5, seat: "FR", bag: true },
+      { key: "fl",    label: "Passenger front left", arm: 49.5, lat: -10.4, seat: "FL" },
+      { key: "bagFL", label: "Baggage under front left", arm: 44.0, lat: -11.5, seat: "FL", bag: true },
+      { key: "ar",    label: "Passenger aft right", arm: 79.5, lat: 12.2, seat: "AR" },
+      { key: "bagAR", label: "Baggage under aft right", arm: 79.5, lat: 12.2, seat: "AR", bag: true },
+      { key: "al",    label: "Passenger aft left", arm: 79.5, lat: -12.2, seat: "AL" },
+      { key: "bagAL", label: "Baggage under aft left", arm: 79.5, lat: -12.2, seat: "AL", bag: true }
+    ],
+    seats: { FR: "Front right seat", FL: "Front left seat", AR: "Aft right seat", AL: "Aft left seat" },
+    removals: [
+      { key: "dFR", label: "Front right door", w: 7.5, arm: 49.4, lat: 24.0 },
+      { key: "dFL", label: "Front left door", w: 7.5, arm: 49.4, lat: -24.0 },
+      { key: "dAR", label: "Aft right door", w: 7.0, arm: 75.4, lat: 23.0 },
+      { key: "dAL", label: "Aft left door", w: 7.0, arm: 75.4, lat: -23.0 },
+      { key: "cyc", label: "Left cyclic", w: 0.6, arm: 35.8, lat: -8.0 },
+      { key: "coll",label: "Left collective", w: 0.8, arm: 47.0, lat: -21.0 },
+      { key: "ped", label: "Left pedals", w: 0.8, arm: 16.8, lat: -9.5 }
+    ],
+    envLong: [[92.0,1550],[92.0,2200],[93.0,2400],[98.0,2400],[102.5,2000],[102.5,1550]],
+    envLat:  [[92.0,-3.0],[92.0,3.0],[100.0,3.0],[102.5,1.5],[102.5,-1.5],[100.0,-3.0]],
+    axes: { x: [91,103,1], y: [1500,2500,100], lat: [-3,3,1] }
+  }
+};
+
+/* Default fleet: empty-weight moments as recorded in the worksheets. */
+const DEFAULT_FLEET = [
+  { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2 },
+  { id: "N7187K", tail: "N7187K", model: "R22", bew: 895.2,  arm: 92706 / 895.2,   lat: -354 / 895.2 }
+];
+
+/* ---------- storage (per device; optional) ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("wb." + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("wb." + k, JSON.stringify(v)); } catch (e) {} }
+};
+
+const S = {
+  fleet: store.get("fleet", null) || DEFAULT_FLEET.map(a => ({ ...a })),
+  tailId: store.get("tail", null),
+  loads: store.get("loads", {}),
+  pilot: store.get("pilot", "")
+};
+if (!S.fleet.find(a => a.id === S.tailId)) S.tailId = S.fleet[0] && S.fleet[0].id;
+
+const $ = id => document.getElementById(id);
+const fmt = (n, d = 1) => (Number.isFinite(n) ? n.toFixed(d) : "–");
+const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
+const ac = () => S.fleet.find(a => a.id === S.tailId);
+const model = () => MODELS[ac().model];
+
+function freshLoad(m) {
+  const st = {}; m.stations.forEach(s => st[s.key] = s.def || 0);
+  return { st, rm: {}, main: m.main.usable, auxAuto: true, aux: m.aux.usable };
+}
+function load() {
+  const a = ac(), m = model();
+  if (!S.loads[a.id]) S.loads[a.id] = freshLoad(m);
+  return S.loads[a.id];
+}
+function saveState() { store.set("fleet", S.fleet); store.set("tail", S.tailId); store.set("loads", S.loads); store.set("pilot", S.pilot); }
+
+/* ---------- math ---------- */
+function auxFromMain(m, g) {
+  const t = m.auxTable;
+  if (g <= t[0][0]) return 0;
+  for (let i = 1; i < t.length; i++) {
+    if (g <= t[i][0]) { const [x0, y0] = t[i-1], [x1, y1] = t[i]; return +(y0 + (g - x0) * (y1 - y0) / (x1 - x0)).toFixed(2); }
+  }
+  return m.aux.usable;
+}
+function auxGal(m, L) { return L.auxAuto ? auxFromMain(m, L.main) : Math.min(Math.max(L.aux, 0), m.aux.usable); }
+
+// [lo, hi] of the polygon along the line axis=v (axis 1: horizontal at y=v → x range; axis 0: vertical at x=v → y range)
+function rangeAt(poly, v, axis) {
+  const o = 1 - axis, hits = [];
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i], q = poly[(i + 1) % poly.length];
+    if (p[axis] === q[axis]) { if (Math.abs(p[axis] - v) < 1e-9) hits.push(p[o], q[o]); continue; }
+    if ((p[axis] - v) * (q[axis] - v) <= 0) hits.push(p[o] + (v - p[axis]) * (q[o] - p[o]) / (q[axis] - p[axis]));
+  }
+  return hits.length ? [Math.min(...hits), Math.max(...hits)] : null;
+}
+const inRange = (r, v) => r && v >= r[0] - 1e-6 && v <= r[1] + 1e-6;
+
+function compute() {
+  const a = ac(), m = model(), L = load();
+  const rows = [];
+  const add = (label, w, arm, lat, kind) => rows.push({ label, w, arm, lat, lm: w * arm, tm: w * lat, kind });
+  add("Basic empty weight", a.bew, a.arm, a.lat, "bew");
+  m.removals.forEach(r => { if (L.rm[r.key]) add("Remove " + r.label.toLowerCase(), -r.w, r.arm, r.lat, "rm"); });
+  m.stations.forEach(s => { const w = num(L.st[s.key]); if (w) add(s.label, w, s.arm, s.lat, "st"); });
+  const sum = list => { const w = list.reduce((t, r) => t + r.w, 0), lm = list.reduce((t, r) => t + r.lm, 0), tm = list.reduce((t, r) => t + r.tm, 0); return { w, lm, tm, cg: lm / w, lcg: tm / w }; };
+  const zf = sum(rows);
+  const mainG = Math.min(Math.max(L.main, 0), m.main.usable), auxG = auxGal(m, L);
+  const fuelRows = [];
+  const fadd = (label, g, t) => { const w = g * m.fuelLb; fuelRows.push({ label: `${label} (${fmt(g)} gal)`, w, arm: t.arm, lat: t.lat, lm: w * t.arm, tm: w * t.lat, kind: "fuel" }); };
+  fadd("Main fuel", mainG, m.main); fadd("Aux fuel", auxG, m.aux);
+  const to = sum(rows.concat(fuelRows));
+
+  const checks = [];
+  const chk = (ok, text) => checks.push({ ok, text });
+  chk(to.w <= m.maxGross + 1e-9, `Takeoff weight ${fmt(to.w)} lb, max ${m.maxGross} lb` + (to.w > m.maxGross ? ` (over by ${fmt(to.w - m.maxGross)} lb)` : ""));
+  chk(zf.w >= m.minGross - 1e-9, `Zero-fuel weight ${fmt(zf.w)} lb, min ${m.minGross} lb`);
+  const pt = (p, name) => {
+    const r = rangeAt(m.envLong, p.w, 1);
+    chk(inRange(r, p.cg), r ? `${name} long. CG ${fmt(p.cg, 2)} in, limits at ${fmt(p.w, 0)} lb: ${fmt(r[0], 2)} – ${fmt(r[1], 2)} in`
+                             : `${name} weight ${fmt(p.w)} lb is outside the envelope's weight range`);
+    const rl = rangeAt(m.envLat, p.cg, 0);
+    chk(inRange(rl, p.lcg), rl ? `${name} lat. CG ${latStr(p.lcg)}, limits at ${fmt(p.cg, 1)} in: ${latStr(rl[0])} to ${latStr(rl[1])}`
+                               : `${name} lat. CG cannot be checked: long. CG ${fmt(p.cg, 2)} in is outside ${m.envLat[0][0]}–${Math.max(...m.envLat.map(q => q[0]))} in`);
+  };
+  pt(to, "Takeoff"); pt(zf, "Zero-fuel");
+  Object.keys(m.seats).forEach(k => {
+    const w = m.stations.filter(s => s.seat === k).reduce((t, s) => t + num(L.st[s.key]), 0);
+    if (w > m.seatMax) chk(false, `${m.seats[k]} ${fmt(w, 0)} lb incl. baggage, max ${m.seatMax} lb`);
+  });
+  m.stations.filter(s => s.bag).forEach(s => { const w = num(L.st[s.key]); if (w > m.bagMax) chk(false, `${s.label} ${fmt(w, 0)} lb, max ${m.bagMax} lb`); });
+  if (num(L.st.pilot) <= 0) chk(false, "Enter a pilot weight");
+  return { rows, fuelRows, zf, to, checks, ok: checks.every(c => c.ok), mainG, auxG };
+}
+const latStr = v => (Math.abs(v) < 0.005 ? "0.00" : fmt(Math.abs(v), 2) + (v > 0 ? " R" : " L"));
+
+/* ---------- charts ---------- */
+function palette(forPrint) {
+  if (forPrint) return { bg: "#ffffff", ink: "#15202b", muted: "#5b6b7a", grid: "#dfe5ea", env: "#1f5f8b", envFill: "rgba(31,95,139,.08)", ok: "#1d7a46", bad: "#b42318", font: "Helvetica, Arial, sans-serif" };
+  const cs = getComputedStyle(document.documentElement), v = n => cs.getPropertyValue(n).trim();
+  return { bg: v("--panel"), ink: v("--ink"), muted: v("--muted"), grid: v("--line"), env: v("--env"), envFill: v("--env-fill"), ok: v("--ok"), bad: v("--bad"), font: v("--body") };
+}
+function drawChart(ctx, W, H, o, P) {
+  const pad = { l: 50, r: 14, t: 14, b: 38 };
+  const [x0, x1, xs] = o.x, [y0, y1, ys] = o.y;
+  const X = v => pad.l + (v - x0) / (x1 - x0) * (W - pad.l - pad.r);
+  const Y = v => H - pad.b - (v - y0) / (y1 - y0) * (H - pad.t - pad.b);
+  ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H);
+  ctx.font = `12px ${P.font}`; ctx.lineWidth = 1;
+  // grid + ticks
+  ctx.strokeStyle = P.grid; ctx.fillStyle = P.muted; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  const every = Math.max(1, Math.ceil(30 / (X(x0 + xs) - X(x0))));
+  for (let v = x0, i = 0; v <= x1 + 1e-9; v += xs, i++) { ctx.beginPath(); ctx.moveTo(X(v), Y(y0)); ctx.lineTo(X(v), Y(y1)); ctx.stroke(); if (i % every === 0) ctx.fillText(String(+v.toFixed(1)), X(v), Y(y0) + 5); }
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (let v = y0; v <= y1 + 1e-9; v += ys) { ctx.beginPath(); ctx.moveTo(X(x0), Y(v)); ctx.lineTo(X(x1), Y(v)); ctx.stroke(); ctx.fillText(o.yFmt ? o.yFmt(v) : String(v), X(x0) - 6, Y(v)); }
+  ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(o.xLabel, (X(x0) + X(x1)) / 2, H - 2);
+  ctx.save(); ctx.translate(12, (Y(y0) + Y(y1)) / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "middle"; ctx.fillText(o.yLabel, 0, 0); ctx.restore();
+  // rotor centerline (station 100)
+  if (100 >= x0 && 100 <= x1) { ctx.setLineDash([4, 4]); ctx.strokeStyle = P.muted; ctx.beginPath(); ctx.moveTo(X(100), Y(y0)); ctx.lineTo(X(100), Y(y1)); ctx.stroke(); ctx.setLineDash([]); }
+  if (o.zeroLine) { ctx.strokeStyle = P.muted; ctx.beginPath(); ctx.moveTo(X(x0), Y(0)); ctx.lineTo(X(x1), Y(0)); ctx.stroke(); }
+  // envelope
+  ctx.beginPath(); o.poly.forEach(([a, b], i) => i ? ctx.lineTo(X(a), Y(b)) : ctx.moveTo(X(a), Y(b))); ctx.closePath();
+  ctx.fillStyle = P.envFill; ctx.fill(); ctx.strokeStyle = P.env; ctx.lineWidth = 2.5; ctx.stroke();
+  // burn line + points (clamped into plot so off-chart points still show at the edge)
+  const cx = v => Math.min(Math.max(v, x0), x1), cy = v => Math.min(Math.max(v, y0), y1);
+  const [zf, to] = o.pts;
+  ctx.strokeStyle = P.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(cx(zf.x)), Y(cy(zf.y))); ctx.lineTo(X(cx(to.x)), Y(cy(to.y))); ctx.stroke();
+  o.pts.forEach(p => {
+    const c = p.ok ? P.ok : P.bad, px = X(cx(p.x)), py = Y(cy(p.y));
+    ctx.beginPath(); ctx.arc(px, py, 6.5, 0, Math.PI * 2);
+    if (p.hollow) { ctx.fillStyle = P.bg; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = c; ctx.stroke(); }
+    else { ctx.fillStyle = c; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = P.bg; ctx.stroke(); }
+    ctx.fillStyle = c; ctx.font = `600 12px ${P.font}`; ctx.textBaseline = "middle";
+    const right = px < (W - pad.r - 40); ctx.textAlign = right ? "left" : "right";
+    ctx.fillText(p.label, px + (right ? 10 : -10), py + (p.hollow ? 12 : -12));
+    ctx.font = `12px ${P.font}`;
+  });
+}
+function chartOpts(m, R, kind) {
+  const okLong = p => inRange(rangeAt(m.envLong, p.w, 1), p.cg), okLat = p => inRange(rangeAt(m.envLat, p.cg, 0), p.lcg);
+  if (kind === "long") return {
+    x: m.axes.x, y: m.axes.y, poly: m.envLong, xLabel: "Longitudinal CG (in. from datum)", yLabel: "Gross weight (lb)",
+    pts: [{ x: R.zf.cg, y: R.zf.w, ok: okLong(R.zf), hollow: true, label: "ZF" }, { x: R.to.cg, y: R.to.w, ok: okLong(R.to), label: "TO" }]
+  };
+  return {
+    x: m.axes.x, y: m.axes.lat, poly: m.envLat, xLabel: "Longitudinal CG (in. from datum)", yLabel: "Lateral CG (in.)", zeroLine: true,
+    yFmt: v => v === 0 ? "0" : Math.abs(v) + (v > 0 ? "R" : "L"),
+    pts: [{ x: R.zf.cg, y: R.zf.lcg, ok: okLat(R.zf), hollow: true, label: "ZF" }, { x: R.to.cg, y: R.to.lcg, ok: okLat(R.to), label: "TO" }]
+  };
+}
+let printing = false;
+function paintCanvas(cv, o) {
+  const dpr = Math.max(window.devicePixelRatio || 1, printing ? 2 : 1), W = cv.clientWidth || 500, H = cv.clientHeight || 400;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawChart(ctx, W, H, o, palette(printing));
+}
+function chartImage(o, W, H) {
+  const cv = document.createElement("canvas"), k = 2.5; cv.width = W * k; cv.height = H * k;
+  const ctx = cv.getContext("2d"); ctx.scale(k, k); drawChart(ctx, W, H, o, palette(true));
+  return cv.toDataURL("image/jpeg", 0.9);
+}
+
+/* ---------- UI ---------- */
+function renderTails() {
+  $("tails").replaceChildren(...S.fleet.map(a => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "tail";
+    b.setAttribute("aria-pressed", a.id === S.tailId); b.innerHTML = `${esc(a.tail)}<small>${a.model}</small>`;
+    b.onclick = () => { S.tailId = a.id; saveState(); renderAll(); };
+    return b;
+  }));
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+function stepper(id, value, onChange, step) {
+  const wrap = document.createElement("div"); wrap.className = "stepper";
+  wrap.innerHTML = `<button type="button" aria-label="Decrease">−</button><input id="${id}" type="number" inputmode="decimal" min="0" step="1" value="${value || ""}" placeholder="0"><button type="button" aria-label="Increase">+</button>`;
+  const [minus, input, plus] = wrap.children;
+  input.addEventListener("input", () => onChange(num(input.value)));
+  input.addEventListener("focus", () => input.select());
+  minus.onclick = () => { input.value = Math.max(0, num(input.value) - step) || ""; onChange(num(input.value)); };
+  plus.onclick = () => { input.value = num(input.value) + step; onChange(num(input.value)); };
+  return wrap;
+}
+function renderStations() {
+  const m = model(), L = load(), box = $("stations"); box.replaceChildren();
+  $("seatHint").textContent = `Max ${m.seatMax} lb per seat incl. baggage · ${m.bagMax} lb per compartment`;
+  Object.keys(m.seats).forEach(k => {
+    const g = document.createElement("div"); g.className = "seatgroup rows";
+    m.stations.filter(s => s.seat === k).forEach(s => {
+      const r = document.createElement("div"); r.className = "row";
+      const id = "st_" + s.key;
+      r.innerHTML = `<label for="${id}">${s.label}<span class="arm">${fmt(s.arm)} in · ${latStr(s.lat)}</span></label>`;
+      r.append(stepper(id, L.st[s.key], v => { L.st[s.key] = v; update(); }, s.bag ? 1 : 5));
+      g.append(r);
+    });
+    const warn = document.createElement("div"); warn.className = "seatwarn"; warn.dataset.seat = k; g.append(warn);
+    box.append(g);
+  });
+}
+function renderRemovals() {
+  const m = model(), L = load();
+  $("removals").replaceChildren(...m.removals.map(r => {
+    const l = document.createElement("label"); l.className = "chip";
+    l.innerHTML = `<input type="checkbox" id="rm_${r.key}" ${L.rm[r.key] ? "checked" : ""}> ${r.label} <span class="num">${r.w} lb</span>`;
+    l.querySelector("input").onchange = e => { L.rm[r.key] = e.target.checked; update(); };
+    return l;
+  }));
+}
+function renderFuel() {
+  const m = model(), L = load();
+  $("mainRange").max = m.main.usable; $("mainRange").value = L.main;
+  $("mainGal").max = m.main.usable; $("mainGal").value = L.main;
+  $("auxGal").max = m.aux.usable; $("auxGal").value = auxGal(m, L);
+  $("auxAuto").checked = L.auxAuto; $("auxManual").hidden = L.auxAuto;
+}
+function setMain(v) { const m = model(), L = load(); L.main = Math.min(Math.max(+v.toFixed(1), 0), m.main.usable); $("mainRange").value = L.main; if (document.activeElement !== $("mainGal")) $("mainGal").value = L.main; if (L.auxAuto) $("auxGal").value = auxGal(m, L); update(); }
+$("mainRange").addEventListener("input", e => { setMain(num(e.target.value)); $("mainGal").value = load().main; });
+$("mainGal").addEventListener("input", e => setMain(num(e.target.value)));
+$("mainGal").addEventListener("blur", () => { $("mainGal").value = load().main; });
+document.querySelectorAll("[data-fuel]").forEach(b => b.onclick = () => { setMain(load().main + +b.dataset.fuel); $("mainGal").value = load().main; });
+$("auxAuto").onchange = e => { const L = load(), m = model(); if (!e.target.checked) L.aux = auxFromMain(m, L.main); L.auxAuto = e.target.checked; renderFuel(); update(); };
+const setAux = v => { const L = load(), m = model(); L.aux = Math.min(Math.max(+v.toFixed(1), 0), m.aux.usable); update(); };
+$("auxGal").addEventListener("input", e => setAux(num(e.target.value)));
+$("auxGal").addEventListener("blur", () => { $("auxGal").value = auxGal(model(), load()); });
+document.querySelectorAll("[data-aux]").forEach(b => b.onclick = () => { setAux(load().aux + +b.dataset.aux); $("auxGal").value = load().aux; });
+
+$("pilot").value = S.pilot;
+$("pilot").addEventListener("input", e => { S.pilot = e.target.value; saveState(); });
+function nowLocal() { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); }
+$("when").value = nowLocal();
+
+let R = null;
+function update() {
+  saveState();
+  const a = ac(), m = model(); R = compute();
+  $("title").textContent = `${a.tail} Weight & Balance`;
+  $("subtitle").textContent = `Robinson ${m.name} · max gross ${m.maxGross} lb`;
+  const v = $("verdict"); v.className = "verdict " + (R.ok ? "ok" : "bad"); v.innerHTML = R.ok ? "Within<br>limits" : "Out of<br>limits";
+  $("roW").textContent = fmt(R.to.w) + " lb";
+  $("roCG").textContent = fmt(R.to.cg, 2) + " in";
+  $("roLat").textContent = latStr(R.to.lcg);
+  const mg = m.maxGross - R.to.w; $("roMargin").textContent = (mg >= 0 ? "" : "−") + fmt(Math.abs(mg)) + " lb"; $("roMargin").style.color = mg < 0 ? "var(--bad)" : "";
+  $("fuelGauge").innerHTML = `<span>Main <span class="num">${fmt(R.mainG)}/${m.main.usable} gal · ${fmt(R.mainG * m.fuelLb)} lb</span></span><span>Aux <span class="num">${fmt(R.auxG)}/${m.aux.usable} gal · ${fmt(R.auxG * m.fuelLb)} lb</span></span><span>Total <span class="num">${fmt((R.mainG + R.auxG) * m.fuelLb)} lb</span></span>`;
+  if (load().auxAuto && document.activeElement !== $("auxGal")) $("auxGal").value = R.auxG;
+  document.querySelectorAll(".seatwarn").forEach(el => {
+    const w = m.stations.filter(s => s.seat === el.dataset.seat).reduce((t, s) => t + num(load().st[s.key]), 0);
+    el.textContent = w > m.seatMax ? `${fmt(w, 0)} lb on this seat; max ${m.seatMax} lb incl. baggage` : "";
+  });
+  $("checks").innerHTML = R.checks.map(c => `<li class="${c.ok ? "" : "bad"}"><span>${esc(c.text)}</span></li>`).join("");
+  const tr = (r, cls = "") => `<tr class="${cls}"><td>${esc(r.label)}</td><td>${fmt(r.w)}</td><td>${fmt(r.arm, 2)}</td><td>${fmt(r.lat, 2)}</td><td>${fmt(r.lm, 0)}</td><td>${fmt(r.tm, 0)}</td></tr>`;
+  const tot = (label, t) => tr({ label, w: t.w, arm: t.cg, lat: t.lcg, lm: t.lm, tm: t.tm }, "total");
+  $("table").innerHTML = `<thead><tr><th>Item</th><th>Wt lb</th><th>Long. arm</th><th>Lat. arm</th><th>Long. mom</th><th>Lat. mom</th></tr></thead><tbody>`
+    + R.rows.map(r => tr(r)).join("") + tot("Zero usable fuel", R.zf) + R.fuelRows.map(r => tr(r)).join("") + tot("Takeoff", R.to) + "</tbody>";
+  paintCanvas($("chartLong"), chartOpts(m, R, "long"));
+  paintCanvas($("chartLat"), chartOpts(m, R, "lat"));
+}
+function renderAll() { renderTails(); renderStations(); renderRemovals(); renderFuel(); renderFleet(); update(); }
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(update, 120); });
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", update);
+window.addEventListener("beforeprint", () => { printing = true; update(); });
+window.addEventListener("afterprint", () => { printing = false; update(); });
+new MutationObserver(update).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+/* ---------- fleet editor ---------- */
+function renderFleet() {
+  $("fleetList").replaceChildren(...S.fleet.map((a, i) => {
+    const d = document.createElement("div"); d.className = "ac";
+    d.innerHTML = `
+      <label class="field">Tail number<input data-f="tail" id="fl_tail_${i}" value="${esc(a.tail)}"></label>
+      <label class="field">Model<select data-f="model" id="fl_model_${i}"><option value="R22" ${a.model === "R22" ? "selected" : ""}>R22 Beta II</option><option value="R44" ${a.model === "R44" ? "selected" : ""}>R44 Raven I</option></select></label>
+      <label class="field">Empty wt (lb)<input data-f="bew" id="fl_bew_${i}" type="number" inputmode="decimal" step="0.1" value="${a.bew}"></label>
+      <label class="field">Long. arm (in)<input data-f="arm" id="fl_arm_${i}" type="number" inputmode="decimal" step="0.01" value="${a.arm}"></label>
+      <label class="field">Lat. arm (in, +R)<input data-f="lat" id="fl_lat_${i}" type="number" inputmode="decimal" step="0.01" value="${a.lat}"></label>
+      <button class="btn small danger del" type="button">Delete</button>`;
+    d.querySelectorAll("[data-f]").forEach(inp => inp.addEventListener("change", () => {
+      const f = inp.dataset.f, val = f === "tail" ? inp.value.trim().toUpperCase() || a.tail : f === "model" ? inp.value : num(inp.value);
+      if (f === "model" && val !== a.model) delete S.loads[a.id];
+      a[f] = val; saveState(); renderAll(); $("fleetMsg").textContent = `Saved ${a.tail}.`;
+    }));
+    const del = d.querySelector(".del");
+    del.onclick = () => {
+      if (S.fleet.length === 1) { $("fleetMsg").textContent = "Keep at least one aircraft."; return; }
+      if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.textContent = "Tap again to delete"; return; }
+      S.fleet.splice(i, 1); delete S.loads[a.id]; if (S.tailId === a.id) S.tailId = S.fleet[0].id; saveState(); renderAll(); $("fleetMsg").textContent = `Deleted ${a.tail}.`;
+    };
+    return d;
+  }));
+}
+function addAc(mdl) {
+  const id = "AC" + Date.now().toString(36);
+  S.fleet.push({ id, tail: "N" + (mdl === "R22" ? "22" : "44") + "NEW", model: mdl, bew: mdl === "R22" ? 880 : 1450, arm: mdl === "R22" ? 103.5 : 105.5, lat: 0 });
+  S.tailId = id; saveState(); renderAll(); $("fleetMsg").textContent = "Added. Replace the tail number, empty weight and arms with this aircraft's W&B record.";
+}
+$("addR22").onclick = () => addAc("R22");
+$("addR44").onclick = () => addAc("R44");
+$("resetFleet").onclick = e => {
+  const b = e.currentTarget;
+  if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Tap again to reset"; return; }
+  b.dataset.armed = ""; b.textContent = "Reset to defaults";
+  S.fleet = DEFAULT_FLEET.map(a => ({ ...a })); S.loads = {}; S.tailId = S.fleet[0].id; saveState(); renderAll(); $("fleetMsg").textContent = "Fleet reset to N931QA and N7187K.";
+};
+$("exportFleet").onclick = () => copyText(btoa(JSON.stringify(S.fleet)), $("fleetMsg"), "Fleet code copied. Paste it into this app on another phone with Load fleet code.");
+$("importFleet").onclick = () => { $("importBox").hidden = false; $("importText").focus(); };
+$("importCancel").onclick = () => { $("importBox").hidden = true; };
+$("importGo").onclick = () => {
+  try {
+    const f = JSON.parse(atob($("importText").value.trim()));
+    if (!Array.isArray(f) || !f.length || !f.every(a => a.id && a.tail && MODELS[a.model] && Number.isFinite(a.bew) && Number.isFinite(a.arm) && Number.isFinite(a.lat))) throw 0;
+    S.fleet = f; S.loads = {}; S.tailId = f[0].id; saveState(); $("importBox").hidden = true; renderAll(); $("fleetMsg").textContent = `Loaded ${f.length} aircraft.`;
+  } catch (e) { $("fleetMsg").textContent = "That code didn't load. Copy the whole fleet code and try again."; }
+};
+
+/* ---------- output: text, PDF, share, print ---------- */
+function summaryText() {
+  const a = ac(), m = model();
+  const L = [`${a.tail} (${m.name}) WEIGHT & BALANCE`, `${new Date($("when").value || Date.now()).toLocaleString()}  PIC: ${S.pilot || "-"}`, `RESULT: ${R.ok ? "WITHIN LIMITS" : "OUT OF LIMITS"}`, ""];
+  R.rows.concat(R.fuelRows).forEach(r => L.push(`${r.label.padEnd(30)} ${fmt(r.w).padStart(7)} lb  @ ${fmt(r.arm, 2)} / ${fmt(r.lat, 2)}`));
+  L.push("", `Zero fuel: ${fmt(R.zf.w)} lb, CG ${fmt(R.zf.cg, 2)} in, lat ${latStr(R.zf.lcg)}`, `Takeoff:   ${fmt(R.to.w)} lb, CG ${fmt(R.to.cg, 2)} in, lat ${latStr(R.to.lcg)}`, "");
+  R.checks.forEach(c => L.push(`${c.ok ? "[OK] " : "[!!] "}${c.text}`));
+  if ($("notes").value.trim()) L.push("", "Notes: " + $("notes").value.trim());
+  return L.join("\n");
+}
+async function copyText(t, msgEl, okMsg) {
+  try { await navigator.clipboard.writeText(t); msgEl.textContent = okMsg; }
+  catch (e) {
+    const ta = document.createElement("textarea"); ta.value = t; ta.style.cssText = "width:100%;min-height:120px;margin-top:8px;font:12px var(--mono)"; ta.readOnly = true;
+    msgEl.replaceChildren("Copy didn't work here. Select the text below and copy it:", ta); ta.focus(); ta.select();
+  }
+}
+$("btnCopy").onclick = () => copyText(summaryText(), $("actMsg"), "Summary copied. Paste it into an email or text.");
+
+function buildPdf() {
+  const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const a = ac(), m = model(), W = 612, M = 40; let y = M;
+  const when = new Date($("when").value || Date.now());
+  doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text(`${a.tail} Weight & Balance`, M, y + 6);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90);
+  doc.text(`Robinson ${m.name}   ·   ${when.toLocaleString()}   ·   PIC: ${S.pilot || "________________"}`, M, y + 24);
+  // verdict box
+  const ok = R.ok; doc.setFillColor(...(ok ? [227, 243, 233] : [253, 236, 234])); doc.setDrawColor(...(ok ? [29, 122, 70] : [180, 35, 24]));
+  doc.roundedRect(W - M - 150, y - 8, 150, 38, 4, 4, "FD"); doc.setTextColor(...(ok ? [29, 122, 70] : [180, 35, 24]));
+  doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text(ok ? "WITHIN LIMITS" : "OUT OF LIMITS", W - M - 75, y + 16, { align: "center" });
+  y += 44; doc.setTextColor(20);
+  // table
+  // x of the left edge for the item column, right edges for the numeric columns
+  const cols = [M + 2, 330, 395, 455, 515, W - M - 2], hdr = ["Item", "Weight lb", "Long. arm", "Lat. arm", "Long. mom", "Lat. mom"];
+  doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.setTextColor(90);
+  hdr.forEach((h, i) => doc.text(h, cols[i], y, { align: i ? "right" : "left" }));
+  y += 5; doc.setDrawColor(180); doc.line(M, y, W - M, y); y += 12; doc.setTextColor(20);
+  const line = (r, bold) => {
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    if (bold) { doc.setFillColor(242, 244, 246); doc.rect(M, y - 10, W - 2 * M, 14, "F"); }
+    [r.label, fmt(r.w), fmt(r.arm, 2), fmt(r.lat, 2), fmt(r.lm, 0), fmt(r.tm, 0)].forEach((t, i) => doc.text(String(t), cols[i], y, { align: i ? "right" : "left" }));
+    y += 14;
+  };
+  R.rows.forEach(r => line(r)); line({ label: "Zero usable fuel weight & CG", w: R.zf.w, arm: R.zf.cg, lat: R.zf.lcg, lm: R.zf.lm, tm: R.zf.tm }, true);
+  R.fuelRows.forEach(r => line(r)); line({ label: "Takeoff gross weight & CG", w: R.to.w, arm: R.to.cg, lat: R.to.lcg, lm: R.to.lm, tm: R.to.tm }, true);
+  y += 6;
+  // charts side by side
+  const cw = (W - 2 * M - 12) / 2, chL = cw / 1.25;
+  doc.addImage(chartImage(chartOpts(m, R, "long"), 400, 320), "JPEG", M, y, cw, chL);
+  doc.addImage(chartImage(chartOpts(m, R, "lat"), 400, 320), "JPEG", M + cw + 12, y, cw, chL);
+  doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(90);
+  doc.text("Longitudinal CG envelope  (filled = takeoff, hollow = zero fuel)", M, y + chL + 10);
+  doc.text("Lateral CG envelope  (+ = right side)", M + cw + 12, y + chL + 10);
+  y += chL + 26;
+  // checks
+  doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(20); doc.text("Limit checks", M, y); y += 14;
+  doc.setFontSize(9); doc.setFont("helvetica", "normal");
+  R.checks.forEach(c => { doc.setTextColor(...(c.ok ? [29, 122, 70] : [180, 35, 24])); doc.text(c.ok ? "OK" : "FAIL", M, y); doc.setTextColor(20); doc.text(c.text, M + 30, y); y += 13; });
+  const notes = $("notes").value.trim();
+  if (notes) { y += 4; doc.setFont("helvetica", "bold"); doc.text("Notes", M, y); y += 12; doc.setFont("helvetica", "normal"); doc.splitTextToSize(notes, W - 2 * M).forEach(t => { doc.text(t, M, y); y += 12; }); }
+  // signature + disclaimer pinned to bottom
+  const by = 792 - M - 30;
+  doc.setDrawColor(120); doc.line(M, by, M + 240, by); doc.setFontSize(8); doc.setTextColor(90); doc.text("PIC signature", M, by + 10);
+  doc.text(`Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&B record). Limits per Robinson ${a.model} POH.`, M, by + 24);
+  doc.text("The pilot in command is responsible for verifying these results against the aircraft's POH.", M, by + 34);
+  return doc;
+}
+const pdfName = () => `${ac().tail}_WB_${($("when").value || nowLocal()).replace(/[:T]/g, "-")}.pdf`;
+
+let downloads = null, inViewer = !!(window.claude && window.claude.use);
+async function onPdf() {
+  const msg = $("actMsg");
+  if (!window.jspdf) { msg.textContent = "The PDF tool didn't load. Check your connection and reload."; return; }
+  const doc = buildPdf();
+  if (downloads) {
+    try { await downloads.save({ filename: pdfName(), data: doc.output("blob") }); msg.textContent = "PDF saved. Open it from your files to print or email it."; }
+    catch (e) { msg.textContent = e && e.code === "declined" ? "Save cancelled." : "Couldn't save the PDF here. Use Copy summary text instead."; }
+    return;
+  }
+  const url = URL.createObjectURL(doc.output("blob")); const a = document.createElement("a"); a.href = url; a.download = pdfName(); document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000); msg.textContent = "PDF downloaded.";
+}
+async function onShare() {
+  const msg = $("actMsg"); if (!window.jspdf) { msg.textContent = "The PDF tool didn't load. Check your connection and reload."; return; }
+  const file = new File([buildPdf().output("blob")], pdfName(), { type: "application/pdf" });
+  try { await navigator.share({ files: [file], title: `${ac().tail} weight & balance`, text: summaryText().split("\n").slice(0, 3).join("\n") }); msg.textContent = "Shared."; }
+  catch (e) { if (e && e.name !== "AbortError") msg.textContent = "Sharing isn't available here. Use Save PDF instead."; }
+}
+$("btnPdf").onclick = onPdf;
+$("btnShare").onclick = onShare;
+$("btnPrint").onclick = () => window.print();
+
+(async () => {
+  if (inViewer) {
+    try { downloads = await window.claude.use("downloads"); } catch (e) { downloads = null; }
+    if (!downloads) $("btnPdf").hidden = true;
+  } else {
+    // standalone hosting: native print and share sheet are available
+    $("btnPrint").hidden = false;
+    try {
+      const probe = new File(["x"], "x.pdf", { type: "application/pdf" });
+      if (navigator.canShare && navigator.canShare({ files: [probe] })) {
+        $("btnShare").hidden = false; $("btnShare").classList.add("primary"); $("btnPdf").classList.remove("primary");
+        $("actions").prepend($("btnShare"));
+      }
+    } catch (e) {}
+    $("btnPdf").textContent = "Download PDF";
+  }
+})();
+
+renderAll();
+</script>
+
+</body>
+</html>
