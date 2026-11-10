@@ -1,4 +1,4 @@
-const CACHE = "wb-20261110003515";
+const CACHE = "wb-20261110005147";
 const CORE = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png",
@@ -13,6 +13,8 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
+  // live weather must never come from the cache
+  if (new URL(req.url).hostname === "api.weather.gov") return;
   // App page: try the network briefly so updates arrive, fall back to the cached copy offline.
   if (req.mode === "navigate") {
     e.respondWith((async () => {

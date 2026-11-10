@@ -224,6 +224,11 @@ details.panel>summary{list-style-position:inside}
 .segb{border:0;background:var(--panel);color:var(--muted);font:600 .82rem var(--body);padding:6px 12px;cursor:pointer}
 .segb[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 .field select{-webkit-appearance:none;appearance:none}
+.wxrow{display:flex;gap:8px;align-items:flex-end;margin:0 0 6px}
+.wxrow .field{flex:1;min-width:0}
+.wxrow input{text-transform:uppercase}
+.wxmsg{margin:0 0 10px}
+.wxmsg.bad{color:var(--bad)}
 .sendbar{display:none}
 @media (max-width:880px){
   .sendbar{display:flex;flex-direction:column;gap:6px;position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -2px 10px rgba(0,0,0,.08);
@@ -422,6 +427,11 @@ details.panel>summary{list-style-position:inside}
       <div class="col">
         <section class="panel">
           <div class="panel-h"><h2>Conditions</h2><span class="hint" id="pModel"></span></div>
+          <form class="wxrow" id="pWxForm">
+            <label class="field">Airport (current weather)<input id="pApt" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="5" placeholder="e.g. KSDL"></label>
+            <button class="btn" id="pWx" type="submit">Get weather</button>
+          </form>
+          <p class="hint wxmsg" id="pWxMsg" hidden></p>
           <div class="fields">
             <label class="field wide">Altitude
               <select id="pMode"><option value="pa">Pressure altitude</option><option value="field">Field elevation + altimeter setting</option></select></label>
@@ -628,7 +638,7 @@ const BUILTIN_FLEET = [
   { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "" }
 ];
 // APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
-const APP_BUILD = "20261110003515";
+const APP_BUILD = "20261110005147";
 const DATA_UPDATED = "2026-10-26";
 const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
@@ -1442,7 +1452,10 @@ const ft = v => Math.round(v).toLocaleString() + " ft";
 const lb = v => Math.round(v).toLocaleString() + " lb";
 
 function renderPerf() {
-  const a = ac(), m = model(), d = PERF[a.model]; PR = computePerf();
+  const a = ac(), m = model(), d = PERF[a.model];
+  // a typed takeoff weight belongs to the aircraft it was typed for
+  if (PI.wt && PI.wtTail !== a.id) { PI.wt = ""; $("pWt").value = ""; savePerf(); }
+  PR = computePerf();
   $("pModel").textContent = `${a.tail} · Robinson ${m.name}`;
   $("pR66").hidden = !d.hover.turbine;
   $("pPaBox").hidden = PI.mode !== "pa"; $("pElevBox").hidden = $("pAltBox").hidden = PI.mode !== "field";
@@ -1589,6 +1602,7 @@ function paintPerfCharts() {
 function perfSummary() {
   if (!PR || !PR.ready) return [];
   const r = PR, out = [`Pressure altitude ${ft(r.pa)}, OAT ${fmt(r.oat)} °C, density altitude ${ft(r.da)}, weight ${lb(r.w)}`];
+  if (PI.wx) out.unshift(`Weather: ${wxLine(PI.wx)}`);
   const hv = (n, x) => `${n}: ${x.maxW == null ? (x.why || "off chart") : `max ${lb(x.maxW)}, ${x.margin >= 0 ? "margin " + lb(x.margin) : "OVER by " + lb(-x.margin)}`}`;
   out.push(hv("IGE hover", r.ige) + " · " + hv("OGE hover", r.oge));
   if (r.map) out.push(r.map.ft || r.map.mcp == null ? "MAP: full throttle" : `MAP limit: MCP ${fmt(r.map.mcp)} in Hg, takeoff (5 min) ${fmt(r.map.to)} in Hg`);
@@ -1600,7 +1614,79 @@ function perfSummary() {
 
 // performance inputs
 const bindPerf = (id, key, kind) => { const el = $(id); if (kind === "check") el.checked = !!PI[key]; else el.value = PI[key] ?? "";
-  el.addEventListener(kind === "check" ? "change" : "input", () => { PI[key] = kind === "check" ? el.checked : el.value; savePerf(); renderPerf(); }); };
+  el.addEventListener(kind === "check" ? "change" : "input", () => {
+    PI[key] = kind === "check" ? el.checked : el.value;
+    if (key === "wt") PI.wtTail = ac().id;
+    if (WX_KEYS.includes(key) && PI.wx) { PI.wx = null; showWxMsg(); } // typed over the fetched weather
+    savePerf(); renderPerf();
+  }); };
+const WX_KEYS = ["mode", "pa", "elev", "alt", "oat"];
+
+/* ---------- current weather: National Weather Service observations (US stations; the API allows browser requests) ---------- */
+const zTime = d => d.toISOString().slice(11, 16).replace(":", "") + "Z";
+function wxLine(w) {
+  const age = Math.round((Date.now() - new Date(w.time)) / 60000);
+  const ago = age < 60 ? `${age} min ago` : `${Math.floor(age / 60)} h ${age % 60} min ago`;
+  const wind = w.wspd == null ? "" : w.wspd < 1 ? " · wind calm" : ` · wind ${w.wdir == null ? "VRB" : String(Math.round(w.wdir / 10) * 10).padStart(3, "0")}° ${Math.round(w.wspd)} kt${w.gust ? " G" + Math.round(w.gust) : ""}`;
+  const altAt = w.altTime && w.altTime !== w.time ? ` (from ${zTime(new Date(w.altTime))})` : "";
+  return `${w.id} ${w.name} · ${zTime(new Date(w.time))} (${ago}) · ${fmt(w.temp, 0)} °C · altimeter ${w.alt.toFixed(2)}${altAt}${wind}`;
+}
+function showWxMsg(text, bad) {
+  const el = $("pWxMsg");
+  if (text == null && PI.wx) {
+    text = wxLine(PI.wx) + ". Check the field elevation.";
+    const old = Date.now() - new Date(PI.wx.time) > 90 * 60000 || Date.now() - new Date(PI.wx.altTime || PI.wx.time) > 3 * 3600e3;
+    bad = old; if (old) text = "Old report, check current conditions: " + text;
+  }
+  el.hidden = !text; el.textContent = text || ""; el.classList.toggle("bad", !!bad);
+}
+async function fetchObs(id) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 12000);
+  try {
+    const r = await fetch(`https://api.weather.gov/stations/${encodeURIComponent(id)}/observations?limit=25`, { headers: { Accept: "application/geo+json" }, signal: ctl.signal });
+    if (r.status === 404 || r.status === 400) return null;
+    if (!r.ok) throw new Error("http " + r.status);
+    const feats = (await r.json()).features || [];
+    if (!feats.length) return null;
+    const obs = feats.map(f => f.properties).filter(p => p && p.timestamp);
+    // the feed often leaves the altimeter out of its decoded fields: read A3020 / Q1013 from the METAR text then
+    const altOf = p => {
+      if (p.barometricPressure && p.barometricPressure.value != null) return p.barometricPressure.value / 3386.389;
+      const m = / A(\d{4})(?: |$)/.exec(p.rawMessage || "") || null, q = / Q(\d{4})(?: |$)/.exec(p.rawMessage || "") || null;
+      return m ? +m[1] / 100 : q ? +q[1] / 33.86389 : null;
+    };
+    const pt = obs.find(p => p.temperature && p.temperature.value != null), pa = obs.find(p => altOf(p) != null);
+    if (!pt || !pa) return { id, none: true };
+    const kt = v => v && v.value != null ? v.value / 1.852 : null, el = (pa.elevation && pa.elevation.value != null ? pa : pt).elevation;
+    return { id, name: pt.stationName || pa.stationName || "", time: pt.timestamp, altTime: pa.timestamp, temp: pt.temperature.value, alt: altOf(pa),
+      elevFt: el && el.value != null ? el.value * 3.28084 : null,
+      wdir: pt.windDirection ? pt.windDirection.value : null, wspd: kt(pt.windSpeed), gust: kt(pt.windGust) };
+  } finally { clearTimeout(t); }
+}
+async function getWeather(e) {
+  if (e) e.preventDefault();
+  const raw = $("pApt").value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  $("pApt").value = raw; PI.apt = raw; savePerf();
+  if (!raw) { showWxMsg("Type an airport identifier, e.g. KSDL or SDL.", true); return; }
+  if (!navigator.onLine) { showWxMsg("No internet connection. Enter the conditions below instead.", true); return; }
+  $("pWx").disabled = true; showWxMsg(`Getting weather for ${raw}…`);
+  try {
+    // US airports are often typed without the K: try KSDL for SDL
+    let w = null;
+    for (const id of raw.length === 3 && /^[A-Z]{3}$/.test(raw) ? ["K" + raw, raw] : [raw]) { w = await fetchObs(id); if (w) break; }
+    if (!w) { showWxMsg(`No weather station found for ${raw}. Use the identifier of a nearby airport with ASOS/AWOS weather, or enter the conditions below.`, true); return; }
+    if (w.none) { showWxMsg(`${w.id} has no recent temperature and altimeter report. Try a nearby airport, or enter the conditions below.`, true); return; }
+    Object.assign(PI, { mode: "field", elev: w.elevFt == null ? PI.elev : String(Math.round(w.elevFt)), alt: w.alt.toFixed(2), oat: String(Math.round(w.temp)), wx: w });
+    ["pMode", "pElev", "pAlt", "pOAT"].forEach((id, i) => $(id).value = PI[["mode", "elev", "alt", "oat"][i]]);
+    savePerf(); renderPerf(); showWxMsg();
+  } catch (err) {
+    showWxMsg(inViewer ? "Live weather works in the hosted app (your site link), not in this preview. Enter the conditions below."
+      : err && err.name === "AbortError" ? "The weather service didn't answer. Try again, or enter the conditions below." : "Couldn't get the weather. Check the connection and try again, or enter the conditions below.", true);
+  } finally { $("pWx").disabled = false; }
+}
+$("pWxForm").addEventListener("submit", getWeather);
+$("pApt").value = PI.apt || "";
+showWxMsg();
 [["pMode", "mode"], ["pPA", "pa"], ["pElev", "elev"], ["pAlt", "alt"], ["pOAT", "oat"], ["pWt", "wt"], ["pAmps", "amps"]].forEach(([id, k]) => bindPerf(id, k));
 [["pAnti", "anti"], ["pHeat", "heat"], ["pWind", "wind"]].forEach(([id, k]) => bindPerf(id, k, "check"));
 const setChart = k => { PI.chart = k; savePerf(); $("pSegIGE").setAttribute("aria-pressed", k === "ige"); $("pSegOGE").setAttribute("aria-pressed", k === "oge"); paintPerfCharts(); };
