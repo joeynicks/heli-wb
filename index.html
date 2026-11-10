@@ -204,6 +204,26 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
 details.panel>summary{list-style-position:inside}
 
 /* phones: Send/Print stay reachable at the bottom of the screen */
+/* page switch and performance view */
+.viewtabs{display:flex;gap:6px;margin-top:12px;border-bottom:1px solid var(--line)}
+.vt{font:600 1rem var(--display);letter-spacing:.04em;padding:8px 14px;border:0;border-bottom:3px solid transparent;background:none;color:var(--muted);cursor:pointer;margin-bottom:-1px}
+.vt[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.pcards{display:flex;flex-direction:column;gap:8px}
+.pcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:baseline;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--field)}
+.pcard b{font-weight:600}
+.pcard .num{font-size:1rem}
+.pcard .sub{grid-column:1/-1;color:var(--muted);font-size:.8rem}
+.chipok,.chipbad,.chipwarn{font:600 .75rem var(--body);padding:2px 8px;border-radius:999px;white-space:nowrap}
+.chipok{background:var(--ok-bg);color:var(--ok)}
+.chipbad{background:var(--bad-bg);color:var(--bad)}
+.chipwarn{background:var(--field);color:var(--warn);border:1px solid var(--warn)}
+.ptable{width:100%;border-collapse:collapse;font-size:.88rem}
+.ptable td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:normal}
+.ptable td:first-child{text-align:left;font-family:var(--body)}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.segb{border:0;background:var(--panel);color:var(--muted);font:600 .82rem var(--body);padding:6px 12px;cursor:pointer}
+.segb[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.field select{-webkit-appearance:none;appearance:none}
 .sendbar{display:none}
 @media (max-width:880px){
   .sendbar{display:flex;flex-direction:column;gap:6px;position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -2px 10px rgba(0,0,0,.08);
@@ -269,6 +289,12 @@ details.panel>summary{list-style-position:inside}
     </div>
   </header>
 
+  <div class="viewtabs" role="tablist" aria-label="Page">
+    <button class="vt" id="tabWB" role="tab" type="button" aria-selected="true">Weight &amp; balance</button>
+    <button class="vt" id="tabPerf" role="tab" type="button" aria-selected="false">Performance</button>
+  </div>
+
+  <div id="viewWB">
   <div class="status" id="status" aria-live="polite">
     <div class="verdict ok" id="verdict">Within limits</div>
     <div class="readouts">
@@ -380,6 +406,71 @@ details.panel>summary{list-style-position:inside}
       </div>
     </details>
   </section>
+  </div>
+
+  <div id="viewPerf" hidden>
+    <div class="status pstatus" aria-live="polite">
+      <div class="verdict pending" id="pVerdict">Enter<br>conditions</div>
+      <div class="readouts">
+        <div class="ro"><b>Density alt</b><span id="pDA">–</span></div>
+        <div class="ro"><b>Takeoff wt</b><span id="pW">–</span></div>
+        <div class="ro"><b>IGE margin</b><span id="pIGE">–</span></div>
+        <div class="ro"><b>OGE margin</b><span id="pOGE">–</span></div>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="col">
+        <section class="panel">
+          <div class="panel-h"><h2>Conditions</h2><span class="hint" id="pModel"></span></div>
+          <div class="fields">
+            <label class="field wide">Altitude
+              <select id="pMode"><option value="pa">Pressure altitude</option><option value="field">Field elevation + altimeter setting</option></select></label>
+            <label class="field" id="pPaBox">Pressure altitude (ft)<input id="pPA" type="number" inputmode="numeric" step="100" placeholder="e.g. 4500"></label>
+            <label class="field" id="pElevBox" hidden>Field elevation (ft)<input id="pElev" type="number" inputmode="numeric" step="10" placeholder="e.g. 4300"></label>
+            <label class="field" id="pAltBox" hidden>Altimeter (in Hg)<input id="pAlt" type="number" inputmode="decimal" step="0.01" placeholder="29.92"></label>
+            <label class="field">Outside air temp (°C)<input id="pOAT" type="number" inputmode="decimal" step="1" placeholder="e.g. 25"></label>
+            <label class="field">Takeoff weight (lb)<input id="pWt" type="number" inputmode="decimal" step="1"></label>
+          </div>
+          <p class="hint" style="margin:0" id="pWtHint"></p>
+          <div id="pR66" class="fields" hidden>
+            <label class="toggle"><input type="checkbox" id="pAnti"> Engine anti-ice on</label>
+            <label class="toggle"><input type="checkbox" id="pHeat"> Full cabin heat</label>
+            <label class="field">Generator load (amps)<input id="pAmps" type="number" inputmode="numeric" step="5" value="50"></label>
+            <label class="toggle"><input type="checkbox" id="pWind"> Wind up to 17 kt</label>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>Hover</h2>
+          <div class="pcards" id="pHover"></div>
+        </section>
+        <section class="panel">
+          <h2 id="pPowerTitle">Power limits</h2>
+          <div id="pPower"></div>
+        </section>
+        <section class="panel">
+          <h2>Never-exceed speed</h2>
+          <div id="pVne"></div>
+        </section>
+      </div>
+      <div class="col">
+        <section class="panel">
+          <div class="panel-h"><h2>Hover ceiling chart</h2>
+            <div class="seg" role="group" aria-label="Chart"><button type="button" class="segb" id="pSegIGE" aria-pressed="true">IGE</button><button type="button" class="segb" id="pSegOGE" aria-pressed="false">OGE</button></div></div>
+          <canvas class="chart" id="chartHover" role="img" aria-label="Hover ceiling versus gross weight chart"></canvas>
+          <p class="hint" style="margin:0" id="pChartNote"></p>
+        </section>
+        <section class="panel" id="pClimbBox" hidden>
+          <h2>Climb at max continuous power</h2>
+          <div id="pClimb"></div>
+          <canvas class="chart" id="chartClimb" role="img" aria-label="Rate of climb versus pressure altitude chart"></canvas>
+        </section>
+        <section class="panel">
+          <h2>About these numbers</h2>
+          <p class="hint" style="margin:0" id="pNotes"></p>
+        </section>
+      </div>
+    </div>
+  </div>
 
   <div class="sendbar" id="sendbar">
     <div class="msg" id="barMsg"></div>
@@ -537,7 +628,7 @@ const BUILTIN_FLEET = [
   { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "" }
 ];
 // APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
-const APP_BUILD = "20261109233738";
+const APP_BUILD = "20261110003515";
 const DATA_UPDATED = "2026-10-26";
 const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
@@ -1012,6 +1103,7 @@ function update() {
     + tot(`Landing, ${RESERVE_MIN} min fuel (${fmt(R.landG)} gal)`, R.ld) + "</tbody>";
   paintCanvas($("chartLong"), chartOpts(m, R, "long"));
   paintCanvas($("chartLat"), chartOpts(m, R, "lat"));
+  renderPerf(); // keeps the performance page (and the PDF's performance lines) in step with the loading
 }
 function renderAll() { renderTails(); renderStations(); renderRemovals(); renderFuel(); renderManifest(); renderFleet(); update(); }
 const fmtDate = d => { const t = new Date(d + "T12:00:00"); return isNaN(t) ? d : t.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); };
@@ -1089,6 +1181,439 @@ $("importGo").onclick = () => {
   } catch (e) { $("fleetMsg").textContent = "That code didn't load. Copy the whole fleet code and try again."; }
 };
 
+/* ---------- performance data (POH Sections 2 and 5) ----------
+   Hover lines are [gross weight lb, pressure altitude ft] points read from the POH charts, one line per OAT.
+   Tables: rows are pressure altitudes, columns OATs; null = full throttle (MAP) or no flight (Vne). */
+const N = null;
+const PERF = {
+  R22: {
+    hover: { oats: [-20, -10, 0, 10, 20, 30, 40], ctrlDA: 9800,
+      ige: { axes: { x: [1100, 1450, 50], y: [5000, 14000, 1000] }, lines: [
+        [[1184,13715],[1205,13261],[1233,12736],[1261,12218],[1289,11701],[1317,11191],[1346,10692],[1365,10347],[1370,10260]],
+        [[1215,12515],[1242,11992],[1271,11474],[1299,10959],[1327,10449],[1356,9946],[1365,9766],[1370,9680]],
+        [[1229,11728],[1247,11361],[1272,10924],[1299,10401],[1328,9887],[1356,9375],[1366,9206],[1370,9140]],
+        [[1254,10787],[1272,10432],[1300,9907],[1328,9388],[1356,8874],[1366,8705],[1370,8640]],
+        [[1272,9877],[1291,9524],[1319,9001],[1347,8488],[1365,8135],[1370,8050]],
+        [[1290,9055],[1309,8697],[1337,8185],[1356,7845],[1366,7676],[1370,7600]],
+        [[1310,8197],[1328,7850],[1347,7503],[1365,7149],[1370,7060]]] },
+      oge: { axes: { x: [1000, 1450, 50], y: [0, 14000, 1000] }, lines: [
+        [[1070,13564],[1101,12931],[1132,12318],[1163,11699],[1194,11077],[1225,10467],[1257,9854],[1267,9649],[1293,9157],[1314,8753],[1336,8370],[1359,8001],[1366,7721],[1370,7560]],
+        [[1087,12723],[1117,12078],[1148,11462],[1179,10842],[1211,10203],[1243,9598],[1263,9190],[1276,8914],[1299,8505],[1321,8107],[1344,7735],[1355,7553],[1360,7224],[1364,6908],[1368,6627],[1370,6500]],
+        [[1116,11572],[1148,10952],[1179,10319],[1210,9687],[1241,9076],[1273,8461],[1301,7959],[1323,7568],[1345,7183],[1350,6892],[1359,6283],[1368,5706],[1370,5580]],
+        [[1134,10675],[1166,10067],[1197,9448],[1229,8840],[1260,8232],[1285,7777],[1306,7368],[1327,6977],[1338,6782],[1344,6489],[1353,5840],[1362,5218],[1367,4844],[1370,4650]],
+        [[1160,9657],[1181,9250],[1202,8844],[1223,8440],[1244,8037],[1265,7633],[1276,7438],[1307,6830],[1328,6429],[1337,6189],[1346,5561],[1354,4939],[1362,4316],[1368,3846],[1370,3700]],
+        [[1180,8818],[1202,8385],[1224,7968],[1310,6258],[1331,5855],[1340,5198],[1349,4569],[1357,3933],[1365,3316],[1368,3101],[1370,2950]],
+        [[1198,7980],[1218,7566],[1239,7162],[1260,6743],[1277,6394],[1312,5708],[1323,5505],[1334,4900],[1342,4266],[1350,3643],[1358,3027],[1366,2407],[1370,2200]]] } },
+    map: { oats: [-20, -10, 0, 10, 20, 30, 40], alts: [0, 2000, 4000, 6000, 8000], toAdd: 0.9, mcp: [
+      [21.5,21.8,22.1,22.3,22.6,22.9,23.2],[21.1,21.4,21.6,21.9,22.2,22.5,22.8],[20.7,21.0,21.2,21.5,21.8,22.0,22.3],[20.3,20.6,20.8,21.1,21.3,21.6,21.9],[19.9,20.2,20.4,20.7,20.9,N,N]] },
+    vne: { oats: [-20, -10, 0, 10, 20, 30, 40], alts: [0, 2000, 4000, 6000, 8000, 10000, 12000, 14000], v: [
+      [102,102,102,102,102,102,102],[102,102,102,102,102,99,96],[102,102,102,98,94,91,87],[102,98,94,90,87,82,77],
+      [94,90,86,80,75,69,64],[86,80,74,68,62,57,N],[74,67,61,N,N,N,N],[61,N,N,N,N,N,N]], heavy: 0, auto: N, doorsOff: N }
+  },
+  R44: {
+    hover: { oats: [-20, -10, 0, 10, 20, 30, 40], ctrlDA: 9600,
+      ige: { axes: { x: [1500, 2500, 100], y: [0, 14000, 1000] }, lines: [
+        [[1933,12770],[1974,12300],[2015,11825],[2058,11360],[2100,10899],[2143,10434],[2185,9976],[2227,9510],[2269,9047],[2314,8610],[2357,8160],[2400,7743]],
+        [[1962,11870],[1980,11612],[2022,11147],[2063,10679],[2105,10217],[2147,9755],[2189,9291],[2231,8829],[2275,8377],[2318,7925],[2361,7469],[2398,7050]],
+        [[1982,11010],[2009,10704],[2051,10237],[2092,9773],[2135,9311],[2177,8847],[2219,8387],[2261,7939],[2305,7487],[2346,7014],[2391,6576],[2400,6480]],
+        [[2019,9963],[2038,9713],[2080,9249],[2122,8784],[2165,8326],[2206,7858],[2249,7395],[2297,6914],[2338,6441],[2383,6002],[2400,5809]],
+        [[2037,9175],[2054,8905],[2098,8447],[2138,7961],[2180,7496],[2221,7015],[2263,6555],[2306,6104],[2349,5650],[2394,5216],[2400,5131]],
+        [[2044,8163],[2062,7900],[2101,7410],[2143,6945],[2183,6455],[2226,6011],[2268,5543],[2310,5082],[2353,4627],[2397,4187],[2400,4122]],
+        [[2025,7252],[2045,7015],[2087,6548],[2128,6076],[2170,5615],[2212,5149],[2255,4694],[2299,4248],[2344,3812],[2390,3385],[2400,3296]]] },
+      oge: { axes: { x: [1500, 2500, 100], y: [0, 14000, 1000] }, lines: [
+        [[1701,12758],[1749,12184],[1811,11404],[1874,10623],[1936,9849],[2003,9021],[2069,8267],[2118,7704],[2179,7000],[2221,6545],[2264,6087],[2306,5627],[2348,5172],[2393,4736],[2400,4665]],
+        [[1729,11708],[1761,11329],[1823,10547],[1886,9766],[1957,8906],[2022,8143],[2088,7389],[2119,7001],[2178,6339],[2220,5877],[2263,5418],[2305,4961],[2348,4510],[2393,4080],[2400,4010]],
+        [[1768,10668],[1830,9887],[1892,9103],[1955,8334],[2020,7578],[2085,6821],[2118,6444],[2177,5760],[2219,5294],[2261,4830],[2303,4370],[2347,3932],[2392,3496],[2400,3420]],
+        [[1791,9590],[1850,8861],[1909,8137],[1970,7430],[2031,6717],[2092,6010],[2134,5548],[2188,4944],[2230,4478],[2273,4029],[2317,3591],[2362,3161],[2380,2914],[2391,2454],[2398,2300]],
+        [[1791,8977],[1852,8179],[1915,7396],[1979,6626],[2043,5856],[2108,5098],[2125,4911],[2181,4254],[2223,3796],[2266,3341],[2309,2888],[2331,2667],[2345,2377],[2363,1688],[2382,1000],[2394,675],[2398,520]],
+        [[1793,8114],[1849,7367],[1907,6631],[1967,5911],[2027,5190],[2088,4481],[2128,4006],[2153,3689],[2192,3279],[2231,2826],[2274,2369],[2296,2148],[2309,1846],[2328,1182],[2346,527],[2361,0]],
+        [[1797,7006],[1856,6279],[1915,5553],[1975,4830],[2035,4114],[2097,3413],[2138,2935],[2186,2385],[2228,1922],[2245,1657],[2256,1331],[2277,666],[2297,0]]] } },
+    map: { oats: [-20, -10, 0, 10, 20, 30, 40], alts: [0, 2000, 4000, 6000], toAdd: 1.6, mcp: [
+      [22.9,23.2,23.5,23.8,24.1,24.4,24.7],[22.5,22.8,23.1,23.4,23.7,24.0,24.2],[22.2,22.5,22.8,23.1,23.4,23.7,23.9],[21.8,22.1,N,N,N,N,N]] },
+    vne: { oats: [-20, -10, 0, 10, 20, 30, 40], alts: [0, 2000, 4000, 6000, 8000, 10000, 12000, 14000], v: [
+      [130,130,130,130,130,130,130],[130,130,130,130,130,127,123],[130,130,130,126,122,118,114],[130,126,122,117,113,108,103],
+      [122,117,112,107,101,96,91],[112,106,101,95,90,85,N],[101,95,89,N,N,N,N],[89,N,N,N,N,N,N]], heavy: -10, auto: -30, doorsOff: 100 }
+  },
+  R44II: {
+    hover: { oats: [-30, -20, -10, 0, 10, 20, 30, 40], ctrlDA: 9800,
+      ige: { axes: { x: [2000, 2600, 100], y: [5000, 14000, 1000] }, lines: [
+        [[2181,13987],[2210,13680],[2244,13329],[2277,12974],[2311,12617],[2345,12271],[2379,11918],[2412,11567],[2446,11214],[2480,10866],[2497,10692],[2500,10660]],
+        [[2228,12859],[2261,12503],[2294,12148],[2327,11789],[2361,11436],[2395,11094],[2429,10739],[2463,10393],[2497,10043],[2500,10010]],
+        [[2248,12037],[2281,11671],[2314,11321],[2347,10963],[2381,10610],[2414,10249],[2448,9900],[2481,9547],[2498,9366],[2500,9345]],
+        [[2280,11070],[2314,10717],[2346,10357],[2380,10004],[2413,9649],[2446,9285],[2480,8935],[2497,8765],[2500,8737]],
+        [[2310,10146],[2344,9798],[2377,9441],[2413,9054],[2446,8694],[2480,8350],[2497,8174],[2500,8143]],
+        [[2346,9187],[2381,8815],[2414,8462],[2447,8102],[2480,7743],[2497,7569],[2500,7535]],
+        [[2363,8426],[2397,8071],[2430,7712],[2463,7352],[2480,7180],[2497,7006],[2500,6975]],
+        [[2398,7480],[2430,7116],[2463,6761],[2480,6582],[2497,6406],[2500,6375]]] },
+      oge: { axes: { x: [1700, 2600, 100], y: [0, 14000, 1000] }, lines: [
+        [[1909,13973],[1951,13478],[1991,12963],[2033,12465],[2075,11967],[2123,11422],[2166,10930],[2209,10441],[2231,10194],[2282,9646],[2325,9161],[2368,8673],[2412,8195],[2456,7722],[2497,7283],[2500,7250]],
+        [[1936,13023],[1978,12521],[2020,12027],[2060,11513],[2108,10958],[2150,10469],[2194,9984],[2238,9475],[2283,8948],[2327,8463],[2370,7982],[2414,7499],[2458,7023],[2499,6628],[2500,6615]],
+        [[1978,11919],[2018,11402],[2071,10824],[2111,10306],[2153,9809],[2195,9314],[2238,8819],[2291,8209],[2334,7720],[2377,7234],[2421,6759],[2466,6291],[2497,5990],[2500,5960]],
+        [[1995,11091],[2036,10585],[2078,10083],[2120,9588],[2161,9084],[2203,8583],[2245,8091],[2291,7555],[2334,7068],[2376,6573],[2421,6102],[2466,5634],[2487,5389],[2496,5031],[2500,4990]],
+        [[2027,10078],[2068,9571],[2110,9069],[2152,8572],[2194,8073],[2236,7578],[2287,6991],[2330,6504],[2373,6016],[2417,5543],[2463,5080],[2476,4760],[2485,4415],[2493,4077],[2499,3919]],
+        [[2057,9141],[2099,8650],[2141,8149],[2182,7652],[2202,7393],[2260,6728],[2308,6140],[2350,5645],[2392,5150],[2436,4665],[2454,4396],[2463,4042],[2473,3713],[2482,3379],[2490,3044],[2498,2809]],
+        [[2066,8460],[2106,7945],[2147,7446],[2190,6953],[2231,6452],[2280,5876],[2321,5377],[2363,4877],[2405,4378],[2426,4125],[2440,3824],[2450,3490],[2460,3157],[2470,2827],[2479,2494],[2489,2165],[2499,1836]],
+        [[2114,7253],[2155,6742],[2197,6247],[2239,5745],[2297,5092],[2339,4602],[2383,4117],[2401,3887],[2413,3762],[2423,3625],[2432,3311],[2442,3000],[2450,2683],[2458,2368],[2468,2057],[2476,1740],[2484,1424],[2493,1109],[2499,958]]] } },
+    map: { oats: [-30, -20, -10, 0, 10, 20, 30, 40], alts: [0, 2000, 4000, 6000, 8000, 10000, 12000], toAdd: 2.8, mcp: [
+      [21.5,21.8,22.1,22.4,22.6,22.9,23.1,23.3],[20.9,21.2,21.5,21.8,22.1,22.3,22.5,22.8],[20.4,20.7,21.0,21.3,21.5,21.8,22.0,22.2],
+      [19.9,20.2,20.5,20.8,21.0,21.3,21.5,21.7],[19.5,19.8,20.1,20.3,20.6,20.8,21.0,21.3],[19.1,19.4,19.6,19.9,N,N,N,N],[N,N,N,N,N,N,N,N]] },
+    vne: { oats: [-30, -20, -10, 0, 10, 20, 30, 40], alts: [0, 2000, 4000, 6000, 8000, 10000, 12000, 14000], v: [
+      [130,130,130,130,130,130,130,130],[130,130,130,130,130,130,127,123],[130,130,130,130,126,122,118,114],[130,130,126,122,117,113,108,103],
+      [126,122,117,112,107,101,96,91],[117,112,106,101,95,90,85,N],[107,101,95,89,N,N,N,N],[95,89,N,N,N,N,N,N]], heavy: -10, auto: -30, doorsOff: 100 }
+  },
+  R44C: {
+    hover: { oats: [-30, -20, -10, 0, 10, 20, 30, 40], ctrlDA: 9600,
+      ige: { axes: { x: [1700, 2300, 100], y: [4000, 14000, 1000] }, lines: [
+        [[1895,13815],[1923,13503],[1958,13099],[1989,12749],[2010,12548],[2030,12264],[2072,11805],[2113,11340],[2155,10877],[2197,10415],[2200,10380]],
+        [[1962,12390],[2052,11403],[2093,10938],[2134,10475],[2176,10018],[2197,9788],[2200,9755]],
+        [[1966,11754],[1984,11551],[2010,11250],[2027,11046],[2047,10797],[2072,10543],[2114,10084],[2155,9615],[2196,9155],[2200,9110]],
+        [[2000,10705],[2063,10012],[2094,9727],[2136,9264],[2177,8800],[2198,8569],[2200,8547]],
+        [[2025,9853],[2056,9512],[2093,9064],[2134,8598],[2176,8137],[2197,7905],[2200,7871]],
+        [[2045,8935],[2089,8442],[2118,8107],[2148,7775],[2178,7453],[2196,7227],[2200,7183]],
+        [[2045,8022],[2097,7429],[2126,7093],[2155,6758],[2184,6419],[2197,6267],[2200,6233]],
+        [[2035,7083],[2090,6461],[2135,5948],[2176,5485],[2197,5253],[2200,5220]]] },
+      oge: { axes: { x: [1500, 2300, 100], y: [0, 14000, 1000] }, lines: [
+        [[1660,13873],[1684,13563],[1728,13000],[1774,12459],[1819,11909],[1864,11356],[1909,10810],[1963,10172],[2009,9627],[2032,9355],[2166,7824],[2191,7539],[2200,7440]],
+        [[1679,12993],[1712,12570],[1757,12023],[1802,11470],[1847,10921],[1893,10371],[1946,9735],[1993,9194],[2038,8649],[2138,7509],[2162,7227],[2186,6954],[2197,6845],[2200,6810]],
+        [[1720,11710],[1938,9136],[1984,8597],[2030,8054],[2062,7699],[2114,7096],[2161,6563],[2197,6167],[2200,6130]],
+        [[1736,11010],[1758,10734],[1803,10177],[1849,9626],[1895,9083],[1941,8534],[1987,7996],[2033,7447],[2056,7170],[2111,6556],[2157,6018],[2196,5607],[2200,5560]],
+        [[1773,9747],[1796,9475],[1842,8928],[1888,8388],[1934,7845],[1981,7304],[2028,6770],[2074,6307],[2111,5829],[2160,5296],[2196,4898],[2200,4850]],
+        [[1780,9008],[1804,8749],[1851,8214],[1899,7686],[1946,7145],[1993,6613],[2044,6034],[2110,5296],[2140,4949],[2160,4723],[2185,4446],[2192,4361],[2196,4300],[2200,3950]],
+        [[1791,8070],[1838,7537],[1885,7001],[1931,6455],[1977,5912],[2023,5374],[2068,4790],[2087,4625],[2107,4401],[2126,4176],[2145,3952],[2157,3670],[2164,3370],[2170,3073],[2177,2781],[2185,2491],[2191,2198],[2199,1942],[2200,1900]],
+        [[1791,7080],[1811,6856],[1849,6406],[1888,5953],[1927,5505],[1966,5053],[2004,4600],[2026,4327],[2053,3971],[2085,3630],[2096,3250],[2107,2750],[2118,2250],[2129,1750],[2140,1250],[2152,750],[2163,250],[2168,0]]] } },
+    map: { oats: [-30, -20, -10, 0, 10, 20, 30, 40], alts: [0, 2000, 4000, 6000, 8000], toAdd: 2.0, mcp: [
+      [21.2,21.4,21.7,22.0,22.2,22.5,22.7,22.9],[20.7,21.0,21.3,21.5,21.8,22.0,22.2,22.5],[20.2,20.5,20.8,21.1,21.3,21.6,21.8,22.0],
+      [19.8,20.1,20.4,20.7,20.9,21.1,21.4,21.6],[19.5,19.7,20.0,20.3,N,N,N,N]] },
+    vne: { oats: [-30, -20, -10, 0, 10, 20, 30, 40], alts: [0, 2000, 4000, 6000, 8000, 10000, 12000, 14000], v: [
+      [120,120,120,120,120,120,120,120],[120,120,120,120,120,120,117,113],[120,120,120,120,116,112,108,104],[120,120,116,112,107,103,98,93],
+      [116,112,107,102,97,91,86,81],[107,102,96,91,85,80,75,N],[97,91,85,79,N,N,N,N],[85,79,N,N,N,N,N,N]], heavy: 0, auto: -20, doorsOff: 100 }
+  },
+  R66: {
+    hover: { ctrlDA: 11000, turbine: true,
+      ige: { oats: [0, 5, 10, 15, 20, 25, 30, 35, 40], wind: 100, axes: { x: [2200, 2800, 100], y: [2000, 14000, 1000] }, lines: [
+        [[2655,13800],[2700,13400]],[[2615,13320],[2650,13030],[2700,12615]],[[2580,12762],[2650,12181],[2700,11766]],
+        [[2540,12315],[2650,11399],[2700,10983]],[[2495,11878],[2550,11434],[2650,10627],[2700,10224]],[[2455,11303],[2550,10525],[2650,9706],[2700,9297]],
+        [[2415,10814],[2450,10509],[2650,8765],[2700,8329]],[[2375,10312],[2450,9649],[2650,7880],[2700,7438]],[[2340,9761],[2450,8770],[2650,6969],[2700,6519]]] },
+      oge: { oats: [-10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40, 45], wind: 50, axes: { x: [2200, 2800, 100], y: [1000, 14000, 1000] }, lines: [
+        [[2545,14000],[2650,13052],[2700,12602]],[[2462,14000],[2550,13193],[2650,12281],[2700,11825]],
+        [[2382,14000],[2450,13378],[2550,12450],[2650,11540],[2700,11080]],[[2281,14000],[2450,12520],[2550,11612],[2650,10766],[2700,10328]],
+        [[2200,13846],[2450,11680],[2550,10809],[2650,9947],[2700,9514]],[[2200,13125],[2450,10881],[2550,9937],[2650,9086],[2700,8637]],
+        [[2200,12404],[2450,10058],[2550,9109],[2650,8181],[2700,7712]],[[2200,11424],[2450,9114],[2550,8166],[2650,7266],[2700,6804]],
+        [[2200,10603],[2450,8253],[2550,7217],[2650,6373],[2700,5903]],[[2200,9428],[2450,7238],[2550,6345],[2650,5486],[2700,5048]],
+        [[2200,8475],[2450,6320],[2550,5430],[2650,4596],[2700,4165]],[[2200,7393],[2550,4481],[2650,3612],[2700,3178]]] } },
+    vne: { oats: [-40, -30, -20, -10, 0, 10, 20, 30, 40, 50], alts: [0, 2000, 4000, 6000, 8000, 10000, 12000, 14000, 16000], v: [
+      [129,130,130,130,130,130,130,130,130,127],[124,130,130,130,130,130,130,126,122,N],[119,127,130,130,129,125,121,117,114,N],
+      [114,122,130,125,121,117,113,108,N,N],[109,117,121,116,112,107,102,97,N,N],[105,112,112,106,101,96,91,86,N,N],
+      [100,106,101,95,90,N,N,N,N,N],[96,95,89,N,N,N,N,N,N,N],[90,N,N,N,N,N,N,N,N,N]], light: 10, doorsOff: 100,
+      autoTable: [
+      [100,100,100,100,100,100,100,100,100,100],[100,100,100,100,100,100,100,100,100,N],[100,100,100,100,100,100,100,100,100,N],
+      [100,100,100,100,100,100,100,100,N,N],[100,100,100,100,100,99,94,89,N,N],[100,100,100,98,93,88,83,78,N,N],
+      [100,98,93,87,82,N,N,N,N,N],[93,87,81,N,N,N,N,N,N,N],[82,N,N,N,N,N,N,N,N,N]] },
+    // rate of climb at max continuous torque/MGT, 60 KIAS: [rate ft/min, pressure altitude ft] per OAT line
+    climb: { oats: [-40, -30, -20, -10, 0, 10, 20, 30, 40],
+      w2700: [
+        [[1400,4100],[1362,5500],[1335,6500],[1186,11500],[1154,12500],[1120,13500],[1107,14000]],
+        [[1399,1155],[1375,2033],[1344,3356],[1311,4675],[1276,5993],[1238,7307],[1200,8622],[1165,9685],[1135,10371],[1112,11500],[1058,13500],[1047,14000]],
+        [[1356,0],[1316,1765],[1271,3524],[1225,5281],[1177,7037],[1126,8789],[1078,10500],[980,14000]],
+        [[1289,0],[1248,1793],[1206,3554],[1160,5312],[1112,7067],[1063,8822],[975,12000],[743,13720]],
+        [[1228,0],[1188,1764],[1145,3526],[1100,5284],[1053,7041],[1005,8797],[973,10000],[608,12700]],
+        [[1169,0],[1129,1794],[1087,3556],[1043,5316],[997,7073],[972,7950],[926,8336],[824,9052],[725,9760],[635,10402],[547,11048],[460,11701],[419,12039]],
+        [[1117,0],[1073,1765],[1028,3524],[983,5282],[971,5721],[930,6088],[837,6758],[745,7434],[654,8110],[563,8783],[475,9457],[389,10126],[304,10800],[266,11123]],
+        [[1065,0],[1027,1325],[987,2637],[973,3073],[884,3851],[787,4556],[697,5268],[604,5941],[517,6632],[432,7327],[346,8023],[265,8733],[185,9446],[109,10173]],
+        [[979,0],[965,451],[823,1579],[400,4950]]],
+      w2200: [
+        [[1800,8000],[1777,8500],[1746,9500],[1709,10750],[1679,11750],[1657,12500],[1617,13750],[1610,14000]],
+        [[1800,4600],[1785,4938],[1748,6239],[1720,7250],[1686,8500],[1656,9500],[1620,10750],[1590,11750],[1568,12500],[1530,13750],[1523,14000]],
+        [[1800,1040],[1762,2500],[1717,4250],[1637,7250],[1538,10750],[1509,11750],[1487,12500],[1449,13750],[1442,14000]],
+        [[1737,0],[1708,1324],[1678,2634],[1645,3941],[1612,5246],[1578,6551],[1544,7856],[1519,8723],[1463,10750],[1433,11750],[1426,12000],[1200,13850]],
+        [[1664,0],[1634,1325],[1603,2634],[1572,3943],[1539,5249],[1506,6556],[1471,7858],[1448,8729],[1426,9500],[1405,10100],[1215,11250],[1138,11750],[1057,12250],[952,12900]],
+        [[1593,0],[1560,1324],[1529,2632],[1496,3939],[1466,5249],[1434,6557],[1400,7861],[1397,8000],[1108,9750],[868,11250],[788,11750],[760,11950]],
+        [[1526,0],[1494,1325],[1460,2631],[1428,3938],[1395,5244],[1384,5680],[1339,6027],[1242,6625],[1146,7226],[1053,7811],[962,8378],[874,8956],[786,9535],[699,10096],[614,10683],[554,11084]],
+        [[1464,0],[1438,866],[1409,1729],[1384,2595],[1371,3026],[1336,3398],[1234,4026],[1138,4618],[1046,5204],[955,5787],[866,6384],[780,6989],[694,7589],[610,8199],[527,8813],[501,9025]],
+        [[1360,0],[1355,400],[1193,1250],[1077,2250],[700,4900]]],
+      axes2700: { x: [0, 1400, 200], y: [0, 14000, 1000] }, axes2200: { x: [500, 1800, 100], y: [0, 14000, 1000] } }
+  }
+};
+PERF.R44C.hover.oats = PERF.R44II.hover.oats;
+
+/* ---------- performance calculations ---------- */
+const PI = Object.assign({ mode: "pa", pa: "", elev: "", alt: "", oat: "", wt: "", anti: false, heat: false, amps: 50, wind: false, chart: "ige" }, store.get("perf", {}));
+let PR = null; // latest performance result, also used by the PDF and printout
+const savePerf = () => store.set("perf", PI);
+function pressAlt() {
+  if (PI.mode === "field") { const e = parseFloat(PI.elev), a = parseFloat(PI.alt); return Number.isFinite(e) && Number.isFinite(a) ? e + (29.92 - a) * 1000 : NaN; }
+  return parseFloat(PI.pa);
+}
+function densityAlt(pa, oat) {
+  const pRatio = Math.pow(1 - 6.8756e-6 * pa, 5.2559), sigma = pRatio / ((oat + 273.15) / 288.15);
+  return (1 - Math.pow(sigma, 0.234969)) / 6.8756e-6;
+}
+// weight on a hover line at pressure altitude h: null above where the line starts (off the chart), its last weight below where it ends (max gross)
+function lineW(line, h) {
+  if (h > line[0][1] + 1e-6) return null;
+  if (h <= line[line.length - 1][1]) return line[line.length - 1][0];
+  for (let i = 1; i < line.length; i++) { const [w0, h0] = line[i - 1], [w1, h1] = line[i]; if (h <= h0 && h >= h1) return h0 === h1 ? w1 : w0 + (h0 - h) * (w1 - w0) / (h0 - h1); }
+  return null;
+}
+// pressure altitude on a hover line at weight w: the line's top when lighter than where it starts, null when heavier than where it ends
+function lineH(line, w) {
+  if (w <= line[0][0]) return line[0][1];
+  if (w > line[line.length - 1][0] + 1e-6) return null;
+  for (let i = 1; i < line.length; i++) { const [w0, h0] = line[i - 1], [w1, h1] = line[i]; if (w >= w0 && w <= w1) return w0 === w1 ? h1 : h0 + (w - w0) * (h1 - h0) / (w1 - w0); }
+  return null;
+}
+// a value read from one line per OAT, interpolated between the two lines around oat; colder than the chart uses the coldest line (conservative)
+function byOat(oats, oat, f) {
+  if (oat > oats[oats.length - 1] + 1e-9) return { v: null, why: `warmer than the chart (${oats[oats.length - 1]} °C)` };
+  if (oat <= oats[0]) return { v: f(0), note: oat < oats[0] ? `colder than the chart, ${oats[0]} °C line used` : "" };
+  let i = 0; while (oats[i + 1] < oat) i++;
+  const a = f(i), b = f(i + 1);
+  if (a == null || b == null) return { v: null, why: "beyond the chart at this altitude and OAT" };
+  return { v: a + (oat - oats[i]) * (b - a) / (oats[i + 1] - oats[i]) };
+}
+const bracket = (arr, v) => { if (v <= arr[0]) return [0, 0]; for (let i = 1; i < arr.length; i++) if (v <= arr[i]) return v === arr[i] ? [i, i] : [i - 1, i]; return [arr.length - 1, arr.length - 1]; };
+// placard speeds: the most restrictive surrounding cell; any no-flight cell means no flight
+function tableLow(tab, alts, oats, pa, oat) {
+  if (pa > alts[alts.length - 1] || oat > oats[oats.length - 1] || oat < oats[0]) return null;
+  const [r0, r1] = bracket(alts, Math.max(pa, 0)), [c0, c1] = bracket(oats, oat);
+  const cells = [tab[r0][c0], tab[r0][c1], tab[r1][c0], tab[r1][c1]];
+  return cells.some(x => x == null) ? null : Math.min(...cells);
+}
+// MAP schedule: interpolated; a full-throttle cell nearby means full throttle
+function mapAt(t, pa, oat) {
+  if (oat > t.oats[t.oats.length - 1]) return { v: null, why: "warmer than the placard" };
+  if (pa > t.alts[t.alts.length - 1]) return { v: null, ft: true };
+  const rowAt = row => {
+    if (oat <= t.oats[0]) { const a = row[0], b = row[1]; return a == null || b == null ? null : a + (oat - t.oats[0]) * (b - a) / (t.oats[1] - t.oats[0]); }
+    const [c0, c1] = bracket(t.oats, oat), a = row[c0], b = row[c1];
+    if (a == null || b == null) return null; return c0 === c1 ? a : a + (oat - t.oats[c0]) * (b - a) / (t.oats[c1] - t.oats[c0]);
+  };
+  const [r0, r1] = bracket(t.alts, Math.max(pa, 0)), a = rowAt(t.mcp[r0]), b = rowAt(t.mcp[r1]);
+  if (a == null || b == null) return { v: null, ft: true };
+  const v = r0 === r1 ? a : a + (Math.max(pa, 0) - t.alts[r0]) * (b - a) / (t.alts[r1] - t.alts[r0]);
+  return { v, note: oat < t.oats[0] ? `colder than the placard (${t.oats[0]} °C), extended` : "" };
+}
+// R66 climb: rate at pressure altitude on one OAT line ([rate, alt] points, altitude rising)
+function lineRoc(line, h) {
+  if (h < line[0][1]) return { v: line[0][0], gt: true };
+  if (h > line[line.length - 1][1] + 1e-6) return null;
+  for (let i = 1; i < line.length; i++) { const [r0, h0] = line[i - 1], [r1, h1] = line[i]; if (h >= h0 && h <= h1) return { v: h1 === h0 ? r1 : r0 + (h - h0) * (r1 - r0) / (h1 - h0) }; }
+  return null;
+}
+function climbAt(c, set, pa, oat) {
+  let gt = false;
+  const r = byOat(c.oats, oat, i => { const x = lineRoc(c[set][i], pa); if (!x) return null; gt = gt || !!x.gt; return x.v; });
+  return { v: r.v, why: r.why, note: r.note, gt };
+}
+
+function computePerf() {
+  const a = ac(), m = model(), d = PERF[a.model], pa = pressAlt(), oat = parseFloat(PI.oat);
+  const w = num(PI.wt) || (R && !R.incomplete ? R.to.w : 0);
+  const res = { model: a.model, pa, oat, w, wFromWB: !num(PI.wt), ready: Number.isFinite(pa) && Number.isFinite(oat) && w > 0 };
+  if (!res.ready) return res;
+  res.da = densityAlt(pa, oat);
+  const h = d.hover, turbine = !!h.turbine;
+  // R66 chart notes: anti-ice +10 °C, full cabin heat +20 °C, +1 °C per 20 A over 50 A; wind up to 17 kt costs 100 lb IGE / 50 lb OGE
+  res.oatHover = turbine ? oat + (PI.anti ? 10 : 0) + (PI.heat ? 20 : 0) + Math.max(0, num(PI.amps) - 50) / 20 : oat;
+  for (const k of ["ige", "oge"]) {
+    const chart = h[k], oats = chart.oats || h.oats, windLb = turbine && PI.wind ? chart.wind : 0;
+    const mw = byOat(oats, res.oatHover, i => lineW(chart.lines[i], pa));
+    const ceil = byOat(oats, res.oatHover, i => lineH(chart.lines[i], Math.min(w + windLb, m.maxGross)));
+    // lines that end at max gross are read to within a few pounds of it: treat that as max gross
+    const maxW = mw.v == null ? null : (mw.v >= m.maxGross - 5 ? m.maxGross : mw.v) - windLb;
+    if (mw.v == null && !mw.why) mw.why = "beyond the chart at this altitude and OAT";
+    res[k] = { maxW, margin: maxW == null ? null : maxW - w, ceiling: ceil.v, why: mw.why, note: mw.note || "", windLb, atGross: mw.v != null && mw.v >= m.maxGross - 5 };
+  }
+  res.ctrlDA = h.ctrlDA;
+  if (d.map) { const t = mapAt(d.map, pa, oat); res.map = { mcp: t.v, to: t.v == null ? null : t.v + d.map.toAdd, ft: !!t.ft, why: t.why, note: t.note || "", toAdd: d.map.toAdd }; }
+  const v = d.vne, base = tableLow(v.v, v.alts, v.oats, pa, oat);
+  let vne = base == null ? null : base + (v.heavy && w > 2200 ? v.heavy : 0) + (v.light && w < 2200 ? v.light : 0);
+  const auto = v.autoTable ? tableLow(v.autoTable, v.alts, v.oats, pa, oat) : (base != null && v.auto != null ? base + v.auto : null);
+  const doorsOff = Object.keys(load().rm).some(k => load().rm[k] && /door/i.test((m.removals.find(r => r.key === k) || {}).label || ""));
+  res.vne = { power: vne, auto, doorsOff, doorsCap: v.doorsOff, hasAuto: v.auto != null || !!v.autoTable };
+  if (d.climb) {
+    const c = d.climb, cw = Math.min(Math.max(w, 2200), 2700), lo = climbAt(c, "w2200", pa, oat), hi = climbAt(c, "w2700", pa, oat);
+    const t = (cw - 2200) / 500;
+    res.climb = lo.v == null || hi.v == null ? { v: null, why: lo.why || hi.why || "outside the chart" } : { v: lo.v + t * (hi.v - lo.v), gt: lo.gt || hi.gt, note: lo.note || hi.note };
+  }
+  return res;
+}
+const ft = v => Math.round(v).toLocaleString() + " ft";
+const lb = v => Math.round(v).toLocaleString() + " lb";
+
+function renderPerf() {
+  const a = ac(), m = model(), d = PERF[a.model]; PR = computePerf();
+  $("pModel").textContent = `${a.tail} · Robinson ${m.name}`;
+  $("pR66").hidden = !d.hover.turbine;
+  $("pPaBox").hidden = PI.mode !== "pa"; $("pElevBox").hidden = $("pAltBox").hidden = PI.mode !== "field";
+  const wb = R && !R.incomplete ? R.to.w : null;
+  $("pWt").placeholder = wb ? String(Math.round(wb * 10) / 10) : "Enter";
+  $("pWtHint").textContent = wb ? `Leave weight blank to use the W&B takeoff weight (${lb(wb)}).` : "Enter the pilot's weight on the W&B page, or type a takeoff weight here.";
+  const v = $("pVerdict");
+  $("pW").textContent = PR.w ? lb(PR.w) : "–";
+  if (!PR.ready) {
+    v.className = "verdict pending"; v.innerHTML = "Enter<br>conditions";
+    $("pDA").textContent = $("pIGE").textContent = $("pOGE").textContent = "–";
+    $("pHover").innerHTML = `<p class="hint" style="margin:0">Enter the pressure altitude (or field elevation and altimeter setting) and OAT to see hover limits.</p>`;
+    $("pPower").innerHTML = $("pVne").innerHTML = ""; $("pClimbBox").hidden = true;
+  } else {
+    $("pDA").textContent = ft(PR.da);
+    const marg = r => r.maxW == null ? (r.why ? "off chart" : "–") : (r.margin >= 0 ? "+" : "−") + lb(Math.abs(r.margin));
+    $("pIGE").textContent = marg(PR.ige); $("pOGE").textContent = marg(PR.oge);
+    $("pIGE").style.color = PR.ige.margin != null && PR.ige.margin < 0 ? "var(--bad)" : ""; $("pOGE").style.color = PR.oge.margin != null && PR.oge.margin < 0 ? "var(--bad)" : "";
+    const igeOk = PR.ige.margin != null && PR.ige.margin >= 0, ogeOk = PR.oge.margin != null && PR.oge.margin >= 0;
+    if (!igeOk) { v.className = "verdict bad"; v.innerHTML = "No IGE<br>hover"; }
+    else if (!ogeOk) { v.className = "verdict pending"; v.innerHTML = "IGE<br>only"; }
+    else { v.className = "verdict ok"; v.innerHTML = "Hover<br>OK"; }
+    // hover cards
+    const card = (title, r) => {
+      const chip = r.maxW == null ? `<span class="chipbad">${esc(r.why || "off chart")}</span>` : r.margin >= 0 ? `<span class="chipok">OK, ${lb(r.margin)} margin</span>` : `<span class="chipbad">Over by ${lb(-r.margin)}</span>`;
+      const max = r.maxW == null ? "–" : (r.atGross ? `${lb(r.maxW)} (max gross${r.windLb ? " less wind allowance" : ""})` : lb(r.maxW));
+      const ceil = r.ceiling == null ? "above max gross" : ft(r.ceiling);
+      return `<div class="pcard"><b>${title}</b>${chip}<span>Max hover weight</span><span class="num">${max}</span><span>Hover ceiling at ${lb(PR.w)}</span><span class="num">${ceil} PA</span>${r.note ? `<span class="sub">${esc(r.note)}</span>` : ""}</div>`;
+    };
+    let extra = "";
+    if (PR.da > PR.ctrlDA) extra = `<div class="pcard"><span class="chipwarn">Above ${PR.ctrlDA.toLocaleString()} ft DA</span><span class="sub">${d.hover.turbine ? "Hover performance is only substantiated up to 11,000 ft density altitude." : `Hover controllability in a 17 kt wind is only substantiated up to ${PR.ctrlDA.toLocaleString()} ft density altitude.`}</span></div>`;
+    const adj = d.hover.turbine && PR.oatHover !== PR.oat ? `<p class="hint" style="margin:0">Charts read at ${fmt(PR.oatHover)} °C (OAT corrected for anti-ice, cabin heat and generator load).</p>` : "";
+    $("pHover").innerHTML = card("In ground effect (2 ft skid height)", PR.ige) + card("Out of ground effect", PR.oge) + extra + adj;
+    // power
+    if (PR.map) {
+      $("pPowerTitle").textContent = "Manifold pressure limits";
+      const row = (k, val) => `<tr><td>${k}</td><td class="num">${val}</td></tr>`;
+      $("pPower").innerHTML = `<table class="ptable">${PR.map.ft || PR.map.mcp == null ? row("Max continuous", PR.map.why || "Full throttle") + row("Takeoff (5 min)", PR.map.why || "Full throttle")
+        : row("Max continuous", fmt(PR.map.mcp) + " in Hg") + row(`Takeoff, 5 min (+${PR.map.toAdd})`, fmt(PR.map.to) + " in Hg")}</table>${PR.map.note ? `<p class="hint" style="margin:6px 0 0">${esc(PR.map.note)}</p>` : ""}`;
+    } else {
+      $("pPowerTitle").textContent = "Torque and MGT limits";
+      $("pPower").innerHTML = `<table class="ptable"><tr><td>Torque, takeoff (5 min)</td><td class="num">100% · 236 lb-ft</td></tr><tr><td>Torque, max continuous</td><td class="num">83% · 196 lb-ft</td></tr>
+        <tr><td>MGT, 5 min</td><td class="num">782 °C</td></tr><tr><td>MGT, continuous</td><td class="num">706 °C</td></tr><tr><td>N1 max</td><td class="num">105%</td></tr></table>
+        <p class="hint" style="margin:6px 0 0">65 KIAS maximum above 83% torque.</p>`;
+    }
+    // Vne
+    const vr = PR.vne, cap = s => vr.doorsOff && vr.doorsCap != null && s != null ? Math.min(s, vr.doorsCap) : s;
+    const vtxt = s => s == null ? "No flight per placard" : `${Math.round(s)} KIAS`;
+    $("pVne").innerHTML = `<table class="ptable"><tr><td>Power on${a.model === "R66" ? (PR.w < 2200 ? " (below 2,200 lb, +10)" : "") : (d.vne.heavy && PR.w > 2200 ? " (over 2,200 lb, −10)" : "")}</td><td class="num">${vtxt(cap(vr.power))}</td></tr>`
+      + (vr.hasAuto ? `<tr><td>Autorotation</td><td class="num">${vtxt(cap(vr.auto))}</td></tr>` : "")
+      + `</table>${vr.doorsOff && vr.doorsCap ? `<p class="hint" style="margin:6px 0 0">Doors removed: ${vr.doorsCap} KIAS maximum.</p>` : ""}<p class="hint" style="margin:6px 0 0">Most restrictive placard value around your altitude and OAT.</p>`;
+    // climb (R66)
+    $("pClimbBox").hidden = !PR.climb;
+    if (PR.climb) {
+      const c = PR.climb, reduce = PR.w <= 2450 ? [400, 700] : [300, 600];
+      $("pClimb").innerHTML = `<div class="pcard"><b>Rate of climb at 60 KIAS</b><span class="num">${c.v == null ? esc(c.why) : (c.gt ? "over " : "") + Math.round(c.v).toLocaleString() + " ft/min"}</span>
+        <span class="sub">Interpolated between the 2,200 and 2,700 lb charts for ${lb(PR.w)}.${PI.anti ? ` Engine anti-ice may reduce this by up to ${reduce[0]} ft/min.` : ""}${PI.heat ? ` Full cabin heat may reduce it by up to ${reduce[1]} ft/min.` : ""}</span></div>`;
+    }
+  }
+  $("pNotes").textContent = (d.hover.turbine
+    ? "Hover charts: zero wind, MGT 5-minute limit, anti-ice and cabin heat off, 50 A generator load. "
+    : "Hover charts: zero wind, full throttle (OGE: takeoff power or full throttle), carburetor heat off. Full carb heat can reduce hover ceilings by up to about 2,400 ft. ")
+    + "Values are read from the POH charts and interpolated between OAT lines. Verify against the POH before flight.";
+  paintPerfCharts();
+}
+
+/* ---------- performance charts ---------- */
+function drawLines(ctx, W, H, o, P) {
+  const pad = { l: 58, r: 34, t: 14, b: 38 };
+  const [x0, x1, xs] = o.x, [y0, y1, ys] = o.y;
+  const X = v => pad.l + (v - x0) / (x1 - x0) * (W - pad.l - pad.r), Y = v => H - pad.b - (v - y0) / (y1 - y0) * (H - pad.t - pad.b);
+  ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H); ctx.font = `12px ${P.font}`; ctx.lineWidth = 1;
+  ctx.strokeStyle = P.grid; ctx.fillStyle = P.muted; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  const every = Math.max(1, Math.ceil(34 / (X(x0 + xs) - X(x0))));
+  for (let v = x0, i = 0; v <= x1 + 1e-9; v += xs, i++) { ctx.beginPath(); ctx.moveTo(X(v), Y(y0)); ctx.lineTo(X(v), Y(y1)); ctx.stroke(); if (i % every === 0) ctx.fillText(String(v), X(v), Y(y0) + 5); }
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  const everyY = Math.max(1, Math.ceil(17 / (Y(y0) - Y(y0 + ys))));
+  for (let v = y0, i = 0; v <= y1 + 1e-9; v += ys, i++) { ctx.beginPath(); ctx.moveTo(X(x0), Y(v)); ctx.lineTo(X(x1), Y(v)); ctx.stroke(); if (i % everyY === 0) ctx.fillText(o.yFmt ? o.yFmt(v) : String(v), X(x0) - 6, Y(v)); }
+  ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(o.xLabel, (X(x0) + X(x1)) / 2, H - 2);
+  ctx.save(); ctx.translate(12, (Y(y0) + Y(y1)) / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "middle"; ctx.fillText(o.yLabel, 0, 0); ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b); ctx.clip();
+  if (o.vline != null) { ctx.setLineDash([5, 4]); ctx.strokeStyle = P.muted; ctx.beginPath(); ctx.moveTo(X(o.vline), Y(y0)); ctx.lineTo(X(o.vline), Y(y1)); ctx.stroke(); ctx.setLineDash([]); }
+  o.lines.forEach(l => {
+    ctx.strokeStyle = l.hi ? P.env : P.muted; ctx.globalAlpha = l.hi ? 1 : 0.55; ctx.lineWidth = l.hi ? 2.5 : 1.5;
+    ctx.beginPath(); l.pts.forEach(([a, b], i) => i ? ctx.lineTo(X(a), Y(b)) : ctx.moveTo(X(a), Y(b))); ctx.stroke(); ctx.globalAlpha = 1;
+  });
+  ctx.restore();
+  ctx.font = `11px ${P.font}`; ctx.fillStyle = P.muted; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  // OAT labels at the light/high end of each line, where the lines are spread apart; skipped where they would overlap
+  const used = [];
+  o.lines.forEach(l => {
+    if (!l.label) return;
+    const [a, b] = l.labelAt || l.pts[0], px = X(Math.min(Math.max(a, x0), x1)), py = Y(Math.min(Math.max(b, y0), y1));
+    const tx = l.labelAt ? Math.min(px + 4, W - pad.r + 3) : px - 4, ty = l.labelAt ? py : py - 6;
+    ctx.textAlign = l.labelAt ? "left" : "right";
+    if (used.some(([ux, uy]) => Math.abs(ux - tx) < 26 && Math.abs(uy - ty) < 12)) return;
+    used.push([tx, ty]); ctx.fillText(l.label, Math.max(tx, l.labelAt ? 0 : pad.l + 24), ty);
+  });
+  (o.marks || []).forEach(mk => {
+    const c = mk.ok ? P.ok : P.bad, px = X(Math.min(Math.max(mk.x, x0), x1)), py = Y(Math.min(Math.max(mk.y, y0), y1));
+    ctx.beginPath(); if (mk.shape === "diamond") { ctx.moveTo(px, py - 7); ctx.lineTo(px + 7, py); ctx.lineTo(px, py + 7); ctx.lineTo(px - 7, py); ctx.closePath(); } else ctx.arc(px, py, 6.5, 0, Math.PI * 2);
+    ctx.fillStyle = c; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = P.bg; ctx.stroke();
+    ctx.font = `600 12px ${P.font}`; ctx.fillStyle = c; ctx.textAlign = px > W * 0.6 ? "right" : "left"; ctx.textBaseline = "bottom";
+    ctx.fillText(mk.label, px + (px > W * 0.6 ? -9 : 9), py - 6);
+  });
+}
+function hoverChartOpts(kind) {
+  const a = ac(), m = model(), h = PERF[a.model].hover, chart = h[kind], oats = chart.oats || h.oats;
+  const o = { x: chart.axes.x, y: chart.axes.y, xLabel: "Gross weight (lb)", yLabel: "Pressure altitude (ft)", vline: m.maxGross,
+    yFmt: v => v === 0 ? "SL" : (v / 1000) + "k",
+    lines: chart.lines.map((pts, i) => ({ pts, label: (oats[i] > 0 ? "+" : "") + oats[i] + "°" })), marks: [] };
+  if (PR && PR.ready) {
+    const r = PR[kind], t = PR.oatHover;
+    // the OAT line for current conditions, interpolated point by point between the neighbouring chart lines
+    if (t >= oats[0] && t <= oats[oats.length - 1]) {
+      let i = 0; while (i < oats.length - 2 && oats[i + 1] < t) i++;
+      const f = (t - oats[i]) / (oats[i + 1] - oats[i]), A = chart.lines[i], B = chart.lines[i + 1], pts = [];
+      for (let hh = Math.min(A[0][1], B[0][1]); hh >= Math.max(chart.axes.y[0], Math.min(A[A.length - 1][1], B[B.length - 1][1])); hh -= 100) {
+        const wa = lineW(A, hh), wb = lineW(B, hh); if (wa != null && wb != null) pts.push([wa + f * (wb - wa), hh]);
+      }
+      if (pts.length > 1) o.lines.push({ pts, hi: true });
+    }
+    o.marks.push({ x: PR.w, y: PR.pa, ok: r.margin != null && r.margin >= 0, label: "You" });
+    if (r.maxW != null) o.marks.push({ x: r.maxW + (r.windLb || 0), y: PR.pa, ok: true, shape: "diamond", label: "Max" });
+  }
+  return o;
+}
+function climbChartOpts() {
+  const c = PERF.R66.climb, heavy = PR && PR.w > 2450, set = heavy ? "w2700" : "w2200", ax = heavy ? c.axes2700 : c.axes2200;
+  const o = { x: ax.x, y: ax.y, xLabel: `Rate of climb (ft/min), ${heavy ? "2,700" : "2,200"} lb chart`, yLabel: "Pressure altitude (ft)", yFmt: v => v === 0 ? "SL" : (v / 1000) + "k",
+    lines: c[set].map((pts, i) => ({ pts, label: (c.oats[i] > 0 ? "+" : "") + c.oats[i] + "°", labelAt: pts[pts.length - 1] })), marks: [] };
+  if (PR && PR.ready) { const r = climbAt(c, set, PR.pa, PR.oat); if (r.v != null) o.marks.push({ x: r.v, y: PR.pa, ok: true, label: "Your conditions" }); }
+  return o;
+}
+function paintPerfCharts() {
+  if ($("viewPerf").hidden) return;
+  const paint = (cv, o) => { const dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 500, H = cv.clientHeight || 400; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawLines(ctx, W, H, o, palette(false)); };
+  paint($("chartHover"), hoverChartOpts(PI.chart));
+  $("pChartNote").textContent = PI.chart === "ige" ? "In ground effect, 2 ft skid height. Bold line = your OAT; dashed line = max gross weight." : "Out of ground effect. Bold line = your OAT; dashed line = max gross weight.";
+  if (!$("pClimbBox").hidden) paint($("chartClimb"), climbChartOpts());
+}
+// text lines for the PDF and printout
+function perfSummary() {
+  if (!PR || !PR.ready) return [];
+  const r = PR, out = [`Pressure altitude ${ft(r.pa)}, OAT ${fmt(r.oat)} °C, density altitude ${ft(r.da)}, weight ${lb(r.w)}`];
+  const hv = (n, x) => `${n}: ${x.maxW == null ? (x.why || "off chart") : `max ${lb(x.maxW)}, ${x.margin >= 0 ? "margin " + lb(x.margin) : "OVER by " + lb(-x.margin)}`}`;
+  out.push(hv("IGE hover", r.ige) + " · " + hv("OGE hover", r.oge));
+  if (r.map) out.push(r.map.ft || r.map.mcp == null ? "MAP: full throttle" : `MAP limit: MCP ${fmt(r.map.mcp)} in Hg, takeoff (5 min) ${fmt(r.map.to)} in Hg`);
+  else out.push("Torque: 100% (5 min), 83% continuous · MGT 782 °C (5 min), 706 °C continuous");
+  const cap = s => r.vne.doorsOff && r.vne.doorsCap != null && s != null ? Math.min(s, r.vne.doorsCap) : s;
+  out.push(`Vne: ${r.vne.power == null ? "no flight per placard" : Math.round(cap(r.vne.power)) + " KIAS"}${r.vne.hasAuto && r.vne.auto != null ? `, autorotation ${Math.round(cap(r.vne.auto))} KIAS` : ""}${r.climb && r.climb.v != null ? ` · Climb ${r.climb.gt ? "over " : ""}${Math.round(r.climb.v)} ft/min` : ""}`);
+  return out;
+}
+
+// performance inputs
+const bindPerf = (id, key, kind) => { const el = $(id); if (kind === "check") el.checked = !!PI[key]; else el.value = PI[key] ?? "";
+  el.addEventListener(kind === "check" ? "change" : "input", () => { PI[key] = kind === "check" ? el.checked : el.value; savePerf(); renderPerf(); }); };
+[["pMode", "mode"], ["pPA", "pa"], ["pElev", "elev"], ["pAlt", "alt"], ["pOAT", "oat"], ["pWt", "wt"], ["pAmps", "amps"]].forEach(([id, k]) => bindPerf(id, k));
+[["pAnti", "anti"], ["pHeat", "heat"], ["pWind", "wind"]].forEach(([id, k]) => bindPerf(id, k, "check"));
+const setChart = k => { PI.chart = k; savePerf(); $("pSegIGE").setAttribute("aria-pressed", k === "ige"); $("pSegOGE").setAttribute("aria-pressed", k === "oge"); paintPerfCharts(); };
+$("pSegIGE").onclick = () => setChart("ige"); $("pSegOGE").onclick = () => setChart("oge");
+setChart(PI.chart);
+// page switch
+function showView(v) {
+  const perf = v === "perf"; $("viewWB").hidden = perf; $("viewPerf").hidden = !perf;
+  $("tabWB").setAttribute("aria-selected", !perf); $("tabPerf").setAttribute("aria-selected", perf);
+  store.set("view", v); if (perf) renderPerf(); else update();
+}
+$("tabWB").onclick = () => showView("wb"); $("tabPerf").onclick = () => showView("perf");
+
 /* ---------- output: text, PDF, share, print ---------- */
 function summaryText() {
   const a = ac(), m = model();
@@ -1164,6 +1689,12 @@ function buildPdf() {
   ensure(28); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(20); doc.text("Limit checks", M, y); y += 14;
   doc.setFontSize(9); doc.setFont("helvetica", "normal");
   R.checks.forEach(c => { ensure(13); doc.setTextColor(...(c.ok ? [29, 122, 70] : [180, 35, 24])); doc.text(c.ok ? "OK" : "FAIL", M, y); doc.setTextColor(20); doc.text(c.text, M + 30, y); y += 13; });
+  const perf = perfSummary();
+  if (perf.length) {
+    y += 4; ensure(26); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(20); doc.text("Performance (from POH charts)", M, y); y += 13;
+    doc.setFontSize(9); doc.setFont("helvetica", "normal");
+    perf.forEach(t => doc.splitTextToSize(t, W - 2 * M).forEach(s => { ensure(12); doc.text(s, M, y); y += 12; }));
+  }
   const notes = $("notes").value.trim();
   if (notes) { y += 4; ensure(26); doc.setFont("helvetica", "bold"); doc.text("Notes", M, y); y += 12; doc.setFont("helvetica", "normal"); doc.splitTextToSize(notes, W - 2 * M).forEach(t => { ensure(12); doc.text(t, M, y); y += 12; }); }
   // page numbers when it runs long
@@ -1235,6 +1766,7 @@ function buildPrintReport() {
     </div>
     <h2>Limit checks</h2>
     <ul class="pr-checks">${R.checks.map(c => `<li class="${c.ok ? "" : "bad"}"><b>${c.ok ? "OK" : "FAIL"}</b>${esc(c.text)}</li>`).join("")}</ul>
+    ${perfSummary().length ? `<h2>Performance (from POH charts)</h2>${perfSummary().map(t => `<p style="margin:2px 0">${esc(t)}</p>`).join("")}` : ""}
     ${notes ? `<h2>Notes</h2><p>${esc(notes)}</p>` : ""}
     <div class="pr-sign"><div class="line"></div>PIC signature</div>
     <p class="pr-foot">Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&amp;B record${a.wbDate ? " dated " + esc(fmtDate(a.wbDate)) : ""}). Limits per Robinson ${m.name} POH. Verify before flight: check these results against the aircraft's POH and current W&amp;B record. The PIC is responsible for safe loading.</p>
@@ -1256,6 +1788,7 @@ window.addEventListener("afterprint", () => { reportReady = false; });
 if (inViewer) { $("btnPrint").hidden = true; $("barPrint").hidden = true; }
 
 renderAll();
+if (store.get("view", "wb") === "perf") showView("perf");
 </script>
 
 </body>
