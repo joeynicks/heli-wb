@@ -228,6 +228,9 @@ details.panel>summary{list-style-position:inside}
 .wxrow .field{flex:1;min-width:0}
 .wxrow input{text-transform:uppercase}
 .wxmsg{margin:0 0 10px}
+/* calculated values: same box and type as the inputs above them */
+.pcalc{margin-top:10px}
+.field output{display:block;font:inherit;font-size:16px;line-height:normal;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-height:43px}
 .wxmsg.bad{color:var(--bad)}
 .sendbar{display:none}
 @media (max-width:880px){
@@ -404,7 +407,8 @@ details.panel>summary{list-style-position:inside}
         <p class="hint" style="margin:0">N7187K and N931QA are built into the app and update when the app is updated. Aircraft you add here use values from their current weight &amp; balance record and are saved on this device only.</p>
         <div id="fleetList" class="fleet"></div>
         <div class="actions">
-          <button class="btn small" id="addR22" type="button">Add R22</button>
+          <button class="btn small" id="addR22B" type="button">Add R22 Beta</button>
+          <button class="btn small" id="addR22" type="button">Add R22 Beta II</button>
           <button class="btn small" id="addR44" type="button">Add R44</button>
           <button class="btn small" id="addR44C" type="button">Add R44 Cadet</button>
           <button class="btn small" id="addR44II" type="button">Add R44 II</button>
@@ -455,14 +459,18 @@ details.panel>summary{list-style-position:inside}
             <label class="field">Generator load (amps)<input id="pAmps" type="number" inputmode="numeric" step="5" value="50"></label>
             <label class="toggle"><input type="checkbox" id="pWind"> Wind up to 17 kt</label>
           </div>
-        </section>
-        <section class="panel">
-          <h2>Hover</h2>
-          <div class="pcards" id="pHover"></div>
+          <div class="fields pcalc" aria-live="polite">
+            <label class="field">Pressure altitude (ft)<output id="pPAout">–</output></label>
+            <label class="field">Density altitude (ft)<output id="pDAout">–</output></label>
+          </div>
         </section>
         <section class="panel">
           <h2 id="pPowerTitle">Power limits</h2>
           <div id="pPower"></div>
+        </section>
+        <section class="panel">
+          <h2>Hover</h2>
+          <div class="pcards" id="pHover"></div>
         </section>
         <section class="panel">
           <h2>Never-exceed speed</h2>
@@ -566,6 +574,9 @@ const MODELS = {
     axes: { x: [91,103,1], y: [1500,2500,100], lat: [-3,3,1] }
   }
 };
+// R22 Beta (O-320-B2C engine): the same weight limits, CG envelope (POH p. 2-5), arms and tanks as the Beta II.
+// Only the engine and performance differ, which is handled in PERF.R22B.
+MODELS.R22B = { ...MODELS.R22, name: "R22 Beta" };
 // R44 II (POH rev. 26 Jan 2024): same seats, fuel (bladder tanks) and doors as the R44;
 // higher weights, one combined removable-controls item, and accessory mount bars.
 MODELS.R44II = {
@@ -645,7 +656,7 @@ const BUILTIN_FLEET = [
   { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "" }
 ];
 // APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
-const APP_BUILD = "20261110105536";
+const APP_BUILD = "20261110112147";
 const DATA_UPDATED = "2026-10-26";
 const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
@@ -933,7 +944,7 @@ function chartImage(o, W, H) {
 function renderTails() {
   $("tails").replaceChildren(...S.fleet.slice().sort(fleetOrder).map(a => {
     const b = document.createElement("button"); b.type = "button"; b.className = "tail";
-    b.setAttribute("aria-pressed", a.id === S.tailId); b.innerHTML = `${esc(a.tail)}<small>${({ R44II: "R44 II", R44C: "R44 Cadet" })[a.model] || a.model}</small>`;
+    b.setAttribute("aria-pressed", a.id === S.tailId); b.innerHTML = `${esc(a.tail)}<small>${({ R22B: "R22 Beta", R44II: "R44 II", R44C: "R44 Cadet" })[a.model] || a.model}</small>`;
     b.onclick = () => { S.tailId = a.id; saveState(); renderAll(); };
     return b;
   }));
@@ -1164,13 +1175,14 @@ function renderFleet() {
   }));
 }
 // placeholder values for a new aircraft until its W&B record is entered
-const NEW_AC = { R22: ["N22NEW", 880, 103.5], R44: ["N44NEW", 1450, 105.5], R44II: ["N44IINEW", 1510, 106.5], R66: ["N66NEW", 1290, 109.0], R44C: ["N44CNEW", 1460, 106.2] };
+const NEW_AC = { R22: ["N22NEW", 880, 103.5], R22B: ["N22BNEW", 850, 103.5], R44: ["N44NEW", 1450, 105.5], R44II: ["N44IINEW", 1510, 106.5], R66: ["N66NEW", 1290, 109.0], R44C: ["N44CNEW", 1460, 106.2] };
 function addAc(mdl) {
   const id = "AC" + Date.now().toString(36), [tail, bew, arm] = NEW_AC[mdl];
   S.custom.push({ id, tail, model: mdl, bew, arm, lat: 0, wbDate: "" });
   S.tailId = id; rebuildFleet(); saveState(); renderAll(); $("fleetBox").open = true; $("fleetMsg").textContent = "Added. Replace the tail number, empty weight, arms and record date with this aircraft's W&B record.";
 }
 $("addR22").onclick = () => addAc("R22");
+$("addR22B").onclick = () => addAc("R22B");
 $("addR44").onclick = () => addAc("R44");
 $("addR44II").onclick = () => addAc("R44II");
 $("addR66").onclick = () => addAc("R66");
@@ -1354,6 +1366,35 @@ const PERF = {
   }
 };
 PERF.R44C.hover.oats = PERF.R44II.hover.oats;
+// full carburetor heat lowers hover ceilings by up to this many feet (POH p. 5-1); the R44 II and R66 have no carburetor
+PERF.R22.carb = 2000; PERF.R44.carb = 2400; PERF.R44C.carb = 2400;
+/* R22 Beta, O-320-B2C engine (R22 POH): IGE hover p. 5-5 (HP, Alpha & Beta chart, to the 1370 lb line), OGE hover p. 5-9,
+   manifold pressure chart p. 2-10. Its Vne chart (p. 2-11, "all R22s except Beta II") plots the same speeds as the
+   Beta II table, so that table is used. */
+PERF.R22B = {
+  carb: 2000,
+  hover: { oats: [-20, -10, 0, 10, 20, 30, 40], ctrlDA: 9800,
+    ige: { axes: { x: [1000, 1400, 50], y: [5000, 14000, 1000] }, lines: [
+      [[1050,13802],[1074,13269],[1125,12291],[1175,11346],[1226,10435],[1275,9564],[1325,8712],[1340,8441],[1355,8187],[1370,7877]],
+      [[1080,12721],[1125,11794],[1175,10848],[1226,9952],[1275,9114],[1325,8274],[1355,7753],[1365,7571],[1370,7443]],
+      [[1107,11697],[1125,11328],[1175,10403],[1275,8676],[1325,7842],[1340,7600],[1355,7329],[1365,7128],[1370,7018]],
+      [[1131,10899],[1226,9096],[1275,8224],[1325,7358],[1340,7094],[1355,6838],[1365,6658],[1370,6532]],
+      [[1151,10037],[1175,9511],[1226,8598],[1275,7769],[1325,6914],[1340,6653],[1355,6401],[1365,6227],[1370,6090]],
+      [[1170,9365],[1275,7329],[1325,6493],[1340,6234],[1365,5807],[1370,5668]],
+      [[1203,8068],[1226,7694],[1275,6878],[1325,6083],[1340,5839],[1355,5599],[1365,5437],[1370,5291]]] },
+    oge: { axes: { x: [950, 1400, 50], y: [2000, 14000, 1000] }, lines: [
+      [[975,13645],[1025,12684],[1075,11800],[1112,11150],[1132,10796],[1161,10271],[1258,8495],[1275,8165],[1309,7559],[1326,7265],[1359,6690],[1370,6488]],
+      [[1004,12485],[1025,12128],[1062,11547],[1082,11158],[1112,10666],[1132,10302],[1161,9770],[1275,7637],[1326,6736],[1359,6145],[1370,5955]],
+      [[1026,11739],[1062,11113],[1082,10749],[1112,10186],[1132,9818],[1161,9262],[1258,7360],[1275,7066],[1309,6433],[1326,6126],[1359,5508],[1370,5332]],
+      [[1056,10754],[1062,10636],[1082,10261],[1112,9690],[1132,9310],[1161,8729],[1258,6830],[1275,6502],[1309,5857],[1326,5533],[1359,4899],[1370,4704]],
+      [[1075,9990],[1082,9840],[1112,9285],[1132,8888],[1161,8263],[1258,6350],[1265,6202],[1309,5334],[1316,5188],[1342,4683],[1359,4357],[1362,4290],[1370,3985]],
+      [[1099,9115],[1112,8846],[1132,8420],[1161,7801],[1258,5869],[1275,5523],[1309,4832],[1326,4497],[1342,4173],[1359,3832],[1363,3750],[1370,3240]],
+      [[1129,7995],[1132,7951],[1161,7412],[1258,5387],[1265,5231],[1287,4771],[1309,4309],[1316,4156],[1342,3612],[1359,3265],[1370,2270]]] } },
+  // 5-minute takeoff limit: one straight line per OAT (sea-level value, same slope per 1000 ft); max continuous is 1.0 in. lower.
+  // ft: the chart's full-throttle line as [pressure altitude in 1000 ft, MAP there, slope per 1000 ft]
+  map: { chart: true, oats: [-20, 0, 20, 40], sl: [23.35, 24.0, 24.63, 25.23], slope: -0.198, ft: [3.33, 24.61, -0.803], mcpSub: 1.0 },
+  vne: PERF.R22.vne
+};
 
 /* ---------- performance calculations ---------- */
 const PI = Object.assign({ mode: "pa", pa: "", elev: "", alt: "", oat: "", wt: "", anti: false, heat: false, amps: 50, wind: false, chart: "ige" }, store.get("perf", {}));
@@ -1420,6 +1461,21 @@ function mapAt(t, pa, oat) {
   const v = r0 === r1 ? a : a + (Math.max(pa, 0) - t.alts[r0]) * (b - a) / (t.alts[r1] - t.alts[r0]);
   return { v, note: oat < t.oats[0] ? `colder than the placard (${t.oats[0]} °C), extended` : "" };
 }
+// Both power ratings for the Performance page, from a placard table (max continuous, takeoff = + toAdd)
+// or from a placard chart (takeoff lines, max continuous = − mcpSub, each compared with the full-throttle line).
+function mapLimits(t, pa, oat) {
+  if (!t.chart) {
+    const r = mapAt(t, pa, oat);
+    return { mcp: r.v, to: r.v == null ? null : r.v + t.toAdd, mcpFt: !!r.ft, toFt: !!r.ft, why: r.why, note: r.note || "", toLabel: `Takeoff, 5 min (+${t.toAdd})` };
+  }
+  const last = t.oats.length - 1;
+  if (oat > t.oats[last]) return { mcp: null, to: null, why: "warmer than the placard" };
+  let i = 0; while (i < last - 1 && t.oats[i + 1] < oat) i++;
+  // colder than the first line: the same spacing is carried on, which gives a lower (safer) limit
+  const sl = t.sl[i] + (oat - t.oats[i]) * (t.sl[i + 1] - t.sl[i]) / (t.oats[i + 1] - t.oats[i]);
+  const a = Math.max(pa, 0) / 1000, to = sl + t.slope * a, mcp = to - t.mcpSub, full = t.ft[1] + t.ft[2] * (a - t.ft[0]);
+  return { mcp, to, mcpFt: mcp >= full, toFt: to >= full, note: oat < t.oats[0] ? `colder than the placard (${t.oats[0]} °C), extended` : "", toLabel: "Takeoff (5 min)" };
+}
 // R66 climb: rate at pressure altitude on one OAT line ([rate, alt] points, altitude rising)
 function lineRoc(line, h) {
   if (h < line[0][1]) return { v: line[0][0], gt: true };
@@ -1454,7 +1510,7 @@ function computePerf() {
     res[k] = { maxW, margin: maxW == null ? null : maxW - w, ceiling: ceil.v, ceilingGt: ceil.v != null && top.v != null && ceil.v >= top.v - 1, why: mw.why, note: mw.note || "", windLb, atGross: mw.v != null && mw.v >= m.maxGross - 5 };
   }
   res.ctrlDA = h.ctrlDA;
-  if (d.map) { const t = mapAt(d.map, pa, oat); res.map = { mcp: t.v, to: t.v == null ? null : t.v + d.map.toAdd, ft: !!t.ft, why: t.why, note: t.note || "", toAdd: d.map.toAdd }; }
+  if (d.map) res.map = mapLimits(d.map, pa, oat);
   const v = d.vne, bt = tableLow(v.v, v.alts, v.oats, pa, oat), base = bt.v;
   const vne = base == null ? null : base + (v.heavy && w > 2200 ? v.heavy : 0) + (v.light && w < 2200 ? v.light : 0);
   const at = v.autoTable ? tableLow(v.autoTable, v.alts, v.oats, pa, oat) : { v: base != null && v.auto != null ? base + v.auto : null, why: bt.why };
@@ -1483,10 +1539,15 @@ function renderPerf() {
   $("pWtHint").textContent = wb ? `Leave weight blank to use the W&B takeoff weight (${lb(wb)}).` : "Enter the pilot's weight on the W&B page, or type a takeoff weight here.";
   const v = $("pVerdict");
   $("pW").textContent = PR.w ? lb(PR.w) : "–";
+  // shown as soon as altitude and OAT are in, even before a weight is known
+  const haveAlt = Number.isFinite(PR.pa), haveDA = haveAlt && Number.isFinite(PR.oat);
+  $("pPAout").textContent = haveAlt ? Math.round(PR.pa).toLocaleString() : "–";
+  $("pDAout").textContent = haveDA ? Math.round(densityAlt(PR.pa, PR.oat)).toLocaleString() : "–";
   if (!PR.ready) {
-    v.className = "verdict pending"; v.innerHTML = "Enter<br>conditions";
-    $("pDA").textContent = $("pIGE").textContent = $("pOGE").textContent = "–";
-    $("pHover").innerHTML = `<p class="hint" style="margin:0">Enter the pressure altitude (or field elevation and altimeter setting) and OAT to see hover limits.</p>`;
+    v.className = "verdict pending"; v.innerHTML = haveDA ? "Enter<br>weight" : "Enter<br>conditions";
+    $("pDA").textContent = haveDA ? ft(densityAlt(PR.pa, PR.oat)) : "–"; $("pIGE").textContent = $("pOGE").textContent = "–";
+    $("pHover").innerHTML = `<p class="hint" style="margin:0">${haveDA ? "Enter the pilot's weight on the W&amp;B page, or type a takeoff weight above, to see hover limits."
+      : "Enter the pressure altitude (or field elevation and altimeter setting) and OAT to see hover limits."}</p>`;
     $("pPower").innerHTML = $("pVne").innerHTML = ""; $("pClimbBox").hidden = true;
   } else {
     $("pDA").textContent = ft(PR.da);
@@ -1512,8 +1573,8 @@ function renderPerf() {
     if (PR.map) {
       $("pPowerTitle").textContent = "Manifold pressure limits";
       const row = (k, val) => `<tr><td>${k}</td><td class="num">${val}</td></tr>`;
-      $("pPower").innerHTML = `<table class="ptable">${PR.map.ft || PR.map.mcp == null ? row("Max continuous", PR.map.why || "Full throttle") + row("Takeoff (5 min)", PR.map.why || "Full throttle")
-        : row("Max continuous", fmt(PR.map.mcp) + " in Hg") + row(`Takeoff, 5 min (+${PR.map.toAdd})`, fmt(PR.map.to) + " in Hg")}</table>${PR.map.note ? `<p class="hint" style="margin:6px 0 0">${esc(PR.map.note)}</p>` : ""}`;
+      const mp = PR.map, lim = (v, full) => mp.why ? esc(mp.why) : full || v == null ? "Full throttle" : fmt(v) + " in Hg";
+      $("pPower").innerHTML = `<table class="ptable">${row("Max continuous", lim(mp.mcp, mp.mcpFt)) + row(mp.toLabel || "Takeoff (5 min)", lim(mp.to, mp.toFt))}</table>${mp.note ? `<p class="hint" style="margin:6px 0 0">${esc(mp.note)}</p>` : ""}`;
     } else {
       $("pPowerTitle").textContent = "Torque and MGT limits";
       $("pPower").innerHTML = `<table class="ptable"><tr><td>Torque, takeoff (5 min)</td><td class="num">100% · 236 lb-ft</td></tr><tr><td>Torque, max continuous</td><td class="num">83% · 196 lb-ft</td></tr>
@@ -1536,7 +1597,7 @@ function renderPerf() {
   }
   $("pNotes").textContent = (d.hover.turbine
     ? "Hover charts: zero wind, MGT 5-minute limit, anti-ice and cabin heat off, 50 A generator load. "
-    : "Hover charts: zero wind, full throttle (OGE: takeoff power or full throttle), carburetor heat off. Full carb heat can reduce hover ceilings by up to about 2,400 ft. ")
+    : "Hover charts: zero wind, full throttle (OGE: takeoff power or full throttle)" + (d.carb ? `, carburetor heat off. Full carb heat can reduce hover ceilings by up to ${d.carb.toLocaleString()} ft. ` : ". "))
     + "Values are read from the POH charts and interpolated between OAT lines. Verify against the POH before flight.";
   paintPerfCharts();
 }
@@ -1624,7 +1685,8 @@ function perfSummary() {
   if (PI.wx) out.unshift(`Weather: ${wxLine(PI.wx)}`);
   const hv = (n, x) => `${n}: ${x.maxW == null ? (x.why || "off chart") : `max ${lb(x.maxW)}, ${x.margin >= 0 ? "margin " + lb(x.margin) : "OVER by " + lb(-x.margin)}`}`;
   out.push(hv("IGE hover", r.ige) + " · " + hv("OGE hover", r.oge));
-  if (r.map) out.push(r.map.ft || r.map.mcp == null ? "MAP: full throttle" : `MAP limit: MCP ${fmt(r.map.mcp)} in Hg, takeoff (5 min) ${fmt(r.map.to)} in Hg`);
+  if (r.map) { const mp = r.map, lim = (v, full) => full || v == null ? "full throttle" : fmt(v) + " in Hg";
+    out.push(mp.why ? `MAP limit: ${mp.why}` : mp.mcpFt && mp.toFt ? "MAP: full throttle" : `MAP limit: MCP ${lim(mp.mcp, mp.mcpFt)}, takeoff (5 min) ${lim(mp.to, mp.toFt)}`); }
   else out.push("Torque: 100% (5 min), 83% continuous · MGT 782 °C (5 min), 706 °C continuous");
   const cap = s => r.vne.doorsOff && r.vne.doorsCap != null && s != null ? Math.min(s, r.vne.doorsCap) : s;
   out.push(`Vne: ${r.vne.power == null ? (r.vne.why || "No flight per placard").replace(/^./, ch => ch.toLowerCase()) : Math.round(cap(r.vne.power)) + " KIAS"}${r.vne.hasAuto && r.vne.auto != null ? `, autorotation ${Math.round(cap(r.vne.auto))} KIAS` : ""}${r.climb && r.climb.v != null ? ` · Climb ${r.climb.gt ? "over " : ""}${Math.round(r.climb.v)} ft/min` : ""}`);
