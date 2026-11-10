@@ -129,7 +129,10 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:var(--field);font-size:.86rem;cursor:pointer;user-select:none}
 .chip input{width:18px;height:18px;accent-color:var(--accent);margin:0}
-.chip .num{color:var(--muted);font-size:.72rem}
+.chip .num{color:var(--muted);font-size:.72rem;margin-left:auto;white-space:nowrap}
+/* two columns, so each left door sits directly left of its right door */
+#removals{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#removals .chip{min-width:0}
 
 /* charts */
 .chart{width:100%;display:block;aspect-ratio:1.25/1;max-width:100%}
@@ -533,8 +536,9 @@ const MODELS = {
     ],
     seats: { R: "Right seat", L: "Left seat" },
     removals: [
-      { key: "doorR", label: "Right door", w: 5.2, arm: 77.5, lat: 21.0 },
+      // each left door just before its right door, then the removable controls
       { key: "doorL", label: "Left door", w: 5.2, arm: 77.5, lat: -21.0 },
+      { key: "doorR", label: "Right door", w: 5.2, arm: 77.5, lat: 21.0 },
       { key: "cyc",   label: "Left cyclic", w: 0.8, arm: 68.0, lat: -8.0 },
       { key: "coll",  label: "Left collective", w: 1.0, arm: 80.7, lat: -19.5 },
       { key: "ped",   label: "Left pedals", w: 0.8, arm: 46.5, lat: -9.5 }
@@ -561,10 +565,11 @@ const MODELS = {
     ],
     seats: { FR: "Front right seat", FL: "Front left seat", AR: "Aft right seat", AL: "Aft left seat" },
     removals: [
-      { key: "dFR", label: "Front right door", w: 7.5, arm: 49.4, lat: 24.0 },
+      // each left door just before its right door; the R44 II uses the first four (the doors)
       { key: "dFL", label: "Front left door", w: 7.5, arm: 49.4, lat: -24.0 },
-      { key: "dAR", label: "Aft right door", w: 7.0, arm: 75.4, lat: 23.0 },
+      { key: "dFR", label: "Front right door", w: 7.5, arm: 49.4, lat: 24.0 },
       { key: "dAL", label: "Aft left door", w: 7.0, arm: 75.4, lat: -23.0 },
+      { key: "dAR", label: "Aft right door", w: 7.0, arm: 75.4, lat: 23.0 },
       { key: "cyc", label: "Left cyclic", w: 0.6, arm: 35.8, lat: -8.0 },
       { key: "coll",label: "Left collective", w: 0.8, arm: 47.0, lat: -21.0 },
       { key: "ped", label: "Left pedals", w: 0.8, arm: 16.8, lat: -9.5 }
@@ -615,10 +620,10 @@ MODELS.R66 = {
   ],
   seats: { FR: "Front right seat", FL: "Front left seat", AR: "Aft right seat", AC: "Aft center seat", AL: "Aft left seat" },
   removals: [
-    { key: "dFR", label: "Front right door", w: 7.5, arm: 49.5, lat: 26.8 },
     { key: "dFL", label: "Front left door", w: 7.5, arm: 49.5, lat: -26.8 },
-    { key: "dAR", label: "Aft right door", w: 7.0, arm: 75.2, lat: 27.2 },
+    { key: "dFR", label: "Front right door", w: 7.5, arm: 49.5, lat: 26.8 },
     { key: "dAL", label: "Aft left door", w: 7.0, arm: 75.2, lat: -27.2 },
+    { key: "dAR", label: "Aft right door", w: 7.0, arm: 75.2, lat: 27.2 },
     { key: "ctl", label: "Left seat controls", w: 2.0, arm: 31.0, lat: -13.0 }
   ],
   envLong: [[91.0,1400],[91.0,2500],[92.0,2700],[98.0,2700],[102.5,2300],[102.5,1400]],
@@ -656,7 +661,7 @@ const BUILTIN_FLEET = [
   { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "" }
 ];
 // APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
-const APP_BUILD = "20261110112147";
+const APP_BUILD = "20261110120300";
 const DATA_UPDATED = "2026-10-26";
 const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
