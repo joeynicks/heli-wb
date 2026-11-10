@@ -310,6 +310,7 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
         <div class="actions">
           <button class="btn small" id="addR22" type="button">Add R22</button>
           <button class="btn small" id="addR44" type="button">Add R44</button>
+          <button class="btn small" id="addR44II" type="button">Add R44 II</button>
           <button class="btn small" id="exportFleet" type="button">Copy fleet code</button>
           <button class="btn small" id="importFleet" type="button">Load fleet code</button>
           <button class="btn small danger" id="resetFleet" type="button">Reset to defaults</button>
@@ -322,7 +323,7 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
 
   <div id="printReport" aria-hidden="true"></div>
 
-  <p class="foot">Limits and arms are from the Robinson R22 and R44 Pilot's Operating Handbooks (Sections 2 and 6, rev. 2014–2015). Empty weight and CG come from each aircraft's own weight &amp; balance record. The pilot in command is responsible for verifying these results against the aircraft's POH.</p>
+  <p class="foot">Limits and arms are from the Robinson R22, R44 and R44 II Pilot's Operating Handbooks (Sections 2 and 6, rev. 2014–2024). The EXAMPLE R44 II uses the POH sample empty weight, not a real aircraft. Empty weight and CG come from each aircraft's own weight &amp; balance record. The pilot in command is responsible for verifying these results against the aircraft's POH.</p>
 </div>
 
 <script>
@@ -384,12 +385,33 @@ const MODELS = {
     axes: { x: [91,103,1], y: [1500,2500,100], lat: [-3,3,1] }
   }
 };
+// R44 II (POH rev. 26 Jan 2024): same seats, fuel (bladder tanks) and doors as the R44;
+// higher weights, one combined removable-controls item, and accessory mount bars.
+MODELS.R44II = {
+  ...MODELS.R44,
+  name: "R44 II", maxGross: 2500, minGross: 1600,
+  stations: [
+    ...MODELS.R44.stations,
+    { key: "accR", label: "Accessory mount bar (right)", arm: 25.0, lat: 14.0 },
+    { key: "accL", label: "Accessory mount bar (left)", arm: 25.0, lat: -14.0 }
+  ],
+  removals: [
+    ...MODELS.R44.removals.slice(0, 4),
+    { key: "ctl", label: "Left seat controls", w: 2.0, arm: 31.0, lat: -13.0 }
+  ],
+  envLong: [[92.0,1600],[92.0,2300],[93.0,2500],[98.0,2500],[102.5,2100],[102.5,1600]],
+  axes: { x: [91,103,1], y: [1500,2600,100], lat: [-3,3,1] }
+};
 
-/* Default fleet: empty-weight moments as recorded in the worksheets. */
+/* Default fleet: empty-weight moments as recorded in the worksheets.
+   EXAMPLE is the R44 II POH sample loading (Section 6, p. 6-6), not a real aircraft. */
 const DEFAULT_FLEET = [
   { id: "N7187K", tail: "N7187K", model: "R22", bew: 895.2,  arm: 92706 / 895.2,   lat: -354 / 895.2 },
-  { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2 }
+  { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2 },
+  { id: "R44II-EX", tail: "EXAMPLE", model: "R44II", bew: 1510, arm: 106.5, lat: 0.2,
+    sample: { st: { pilot: 170, fl: 170, ar: 170, al: 170, bagFR: 10, bagFL: 10, bagAL: 10, accR: 5 }, rm: { dFR: true } } }
 ];
+const FLEET_VERSION = 2;
 // R22s before R44s, then by tail number
 const fleetOrder = (a, b) => a.model.localeCompare(b.model) || a.tail.localeCompare(b.tail);
 
@@ -405,6 +427,11 @@ const S = {
   loads: store.get("loads", {}),
   pilot: store.get("pilot", "")
 };
+// phones that saved a fleet before the R44 II existed get the example added once
+if (store.get("fleetVer", 1) < FLEET_VERSION) {
+  DEFAULT_FLEET.filter(d => d.id === "R44II-EX" && !S.fleet.find(a => a.id === d.id)).forEach(d => S.fleet.push({ ...d }));
+  store.set("fleetVer", FLEET_VERSION); store.set("fleet", S.fleet);
+}
 if (!S.fleet.find(a => a.id === S.tailId)) S.tailId = S.fleet.slice().sort(fleetOrder)[0].id;
 
 const $ = id => document.getElementById(id);
@@ -413,13 +440,14 @@ const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; }
 const ac = () => S.fleet.find(a => a.id === S.tailId);
 const model = () => MODELS[ac().model];
 
-function freshLoad(m) {
+function freshLoad(m, a) {
   const st = {}; m.stations.forEach(s => st[s.key] = s.def || 0);
-  return { st, rm: {}, main: m.main.usable, auxAuto: true, aux: m.aux.usable, mf: {} };
+  const smp = (a && a.sample) || {};
+  return { st: { ...st, ...smp.st }, rm: { ...smp.rm }, main: m.main.usable, auxAuto: true, aux: m.aux.usable, mf: {} };
 }
 function load() {
   const a = ac(), m = model();
-  if (!S.loads[a.id]) S.loads[a.id] = freshLoad(m);
+  if (!S.loads[a.id]) S.loads[a.id] = freshLoad(m, a);
   if (!S.loads[a.id].mf) S.loads[a.id].mf = {};
   return S.loads[a.id];
 }
@@ -504,7 +532,7 @@ function palette(forPrint) {
   return { bg: v("--panel"), ink: v("--ink"), muted: v("--muted"), grid: v("--line"), env: v("--env"), envFill: v("--env-fill"), ok: v("--ok"), bad: v("--bad"), font: v("--body") };
 }
 function drawChart(ctx, W, H, o, P) {
-  const pad = { l: 50, r: 14, t: 14, b: 38 };
+  const pad = { l: 58, r: 14, t: 14, b: 38 };
   const [x0, x1, xs] = o.x, [y0, y1, ys] = o.y;
   const X = v => pad.l + (v - x0) / (x1 - x0) * (W - pad.l - pad.r);
   const Y = v => H - pad.b - (v - y0) / (y1 - y0) * (H - pad.t - pad.b);
@@ -515,7 +543,8 @@ function drawChart(ctx, W, H, o, P) {
   const every = Math.max(1, Math.ceil(30 / (X(x0 + xs) - X(x0))));
   for (let v = x0, i = 0; v <= x1 + 1e-9; v += xs, i++) { ctx.beginPath(); ctx.moveTo(X(v), Y(y0)); ctx.lineTo(X(v), Y(y1)); ctx.stroke(); if (i % every === 0) ctx.fillText(String(+v.toFixed(1)), X(v), Y(y0) + 5); }
   ctx.textAlign = "right"; ctx.textBaseline = "middle";
-  for (let v = y0; v <= y1 + 1e-9; v += ys) { ctx.beginPath(); ctx.moveTo(X(x0), Y(v)); ctx.lineTo(X(x1), Y(v)); ctx.stroke(); ctx.fillText(o.yFmt ? o.yFmt(v) : String(v), X(x0) - 6, Y(v)); }
+  const everyY = Math.max(1, Math.ceil(17 / (Y(y0) - Y(y0 + ys))));
+  for (let v = y0, i = 0; v <= y1 + 1e-9; v += ys, i++) { ctx.beginPath(); ctx.moveTo(X(x0), Y(v)); ctx.lineTo(X(x1), Y(v)); ctx.stroke(); if (i % everyY === 0) ctx.fillText(o.yFmt ? o.yFmt(v) : String(v), X(x0) - 6, Y(v)); }
   ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(o.xLabel, (X(x0) + X(x1)) / 2, H - 2);
   ctx.save(); ctx.translate(12, (Y(y0) + Y(y1)) / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "middle"; ctx.fillText(o.yLabel, 0, 0); ctx.restore();
   // rotor centerline (station 100)
@@ -599,6 +628,18 @@ function renderStations() {
     const warn = document.createElement("div"); warn.className = "seatwarn"; warn.dataset.seat = k; g.append(warn);
     box.append(g);
   });
+  // stations outside the seats (R44 II accessory mount bars)
+  const extra = m.stations.filter(s => !s.seat);
+  if (extra.length) {
+    const g = document.createElement("div"); g.className = "seatgroup rows";
+    extra.forEach(s => {
+      const r = document.createElement("div"), id = "st_" + s.key; r.className = "row";
+      r.innerHTML = `<label for="${id}">${s.label}<span class="arm">${fmt(s.arm)} in · ${latStr(s.lat)}</span></label>`;
+      r.append(stepper(id, L.st[s.key], v => { L.st[s.key] = v; update(); }, 1));
+      g.append(r);
+    });
+    box.append(g);
+  }
 }
 function renderRemovals() {
   const m = model(), L = load();
@@ -700,7 +741,7 @@ function renderFleet() {
     const d = document.createElement("div"); d.className = "ac";
     d.innerHTML = `
       <label class="field">Tail number<input data-f="tail" id="fl_tail_${i}" value="${esc(a.tail)}"></label>
-      <label class="field">Model<select data-f="model" id="fl_model_${i}"><option value="R22" ${a.model === "R22" ? "selected" : ""}>R22 Beta II</option><option value="R44" ${a.model === "R44" ? "selected" : ""}>R44 Raven I</option></select></label>
+      <label class="field">Model<select data-f="model" id="fl_model_${i}">${Object.keys(MODELS).map(k => `<option value="${k}" ${a.model === k ? "selected" : ""}>${MODELS[k].name}</option>`).join("")}</select></label>
       <label class="field">Empty wt (lb)<input data-f="bew" id="fl_bew_${i}" type="number" inputmode="decimal" step="0.1" value="${a.bew}"></label>
       <label class="field">Long. arm (in)<input data-f="arm" id="fl_arm_${i}" type="number" inputmode="decimal" step="0.01" value="${a.arm}"></label>
       <label class="field">Lat. arm (in, +R)<input data-f="lat" id="fl_lat_${i}" type="number" inputmode="decimal" step="0.01" value="${a.lat}"></label>
@@ -719,18 +760,21 @@ function renderFleet() {
     return d;
   }));
 }
+// placeholder values for a new aircraft until its W&B record is entered
+const NEW_AC = { R22: ["N22NEW", 880, 103.5], R44: ["N44NEW", 1450, 105.5], R44II: ["N44IINEW", 1510, 106.5] };
 function addAc(mdl) {
-  const id = "AC" + Date.now().toString(36);
-  S.fleet.push({ id, tail: "N" + (mdl === "R22" ? "22" : "44") + "NEW", model: mdl, bew: mdl === "R22" ? 880 : 1450, arm: mdl === "R22" ? 103.5 : 105.5, lat: 0 });
+  const id = "AC" + Date.now().toString(36), [tail, bew, arm] = NEW_AC[mdl];
+  S.fleet.push({ id, tail, model: mdl, bew, arm, lat: 0 });
   S.tailId = id; saveState(); renderAll(); $("fleetMsg").textContent = "Added. Replace the tail number, empty weight and arms with this aircraft's W&B record.";
 }
 $("addR22").onclick = () => addAc("R22");
 $("addR44").onclick = () => addAc("R44");
+$("addR44II").onclick = () => addAc("R44II");
 $("resetFleet").onclick = e => {
   const b = e.currentTarget;
   if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Tap again to reset"; return; }
   b.dataset.armed = ""; b.textContent = "Reset to defaults";
-  S.fleet = DEFAULT_FLEET.map(a => ({ ...a })); S.loads = {}; S.tailId = S.fleet[0].id; saveState(); renderAll(); $("fleetMsg").textContent = "Fleet reset to N931QA and N7187K.";
+  S.fleet = DEFAULT_FLEET.map(a => ({ ...a })); S.loads = {}; S.tailId = S.fleet[0].id; saveState(); renderAll(); $("fleetMsg").textContent = "Fleet reset to N7187K, N931QA and the R44 II example.";
 };
 $("exportFleet").onclick = () => copyText(btoa(JSON.stringify(S.fleet)), $("fleetMsg"), "Fleet code copied. Paste it into this app on another phone with Load fleet code.");
 $("importFleet").onclick = () => { $("importBox").hidden = false; $("importText").focus(); };
@@ -824,7 +868,7 @@ function buildPdf() {
   // signature + disclaimer pinned to bottom of the last page
   const by = H - M - 30;
   doc.setDrawColor(120); doc.line(M, by, M + 240, by); doc.setFontSize(8); doc.setTextColor(90); doc.text("PIC signature", M, by + 10);
-  doc.text(`Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&B record). Limits per Robinson ${a.model} POH.`, M, by + 24);
+  doc.text(`Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&B record). Limits per Robinson ${m.name} POH.`, M, by + 24);
   doc.text("The pilot in command is responsible for verifying these results against the aircraft's POH.", M, by + 34);
   return doc;
 }
@@ -883,7 +927,7 @@ function buildPrintReport() {
     <ul class="pr-checks">${R.checks.map(c => `<li class="${c.ok ? "" : "bad"}"><b>${c.ok ? "OK" : "FAIL"}</b>${esc(c.text)}</li>`).join("")}</ul>
     ${notes ? `<h2>Notes</h2><p>${esc(notes)}</p>` : ""}
     <div class="pr-sign"><div class="line"></div>PIC signature</div>
-    <p class="pr-foot">Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&amp;B record). Limits per Robinson ${a.model} POH. The pilot in command is responsible for verifying these results against the aircraft's POH.</p>`;
+    <p class="pr-foot">Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&amp;B record). Limits per Robinson ${m.name} POH. The pilot in command is responsible for verifying these results against the aircraft's POH.</p>`;
 }
 let reportReady = false;
 $("btnPrint").onclick = async () => {
