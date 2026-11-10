@@ -54,6 +54,8 @@ h2{font-size:1.15rem;text-transform:uppercase;letter-spacing:.06em;color:var(--m
 /* top bar */
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;justify-content:space-between}
 .top .sub{color:var(--muted);font-size:.85rem}
+.top .acinfo{color:var(--muted);font:400 .78rem var(--mono);margin-top:2px}
+.top .acinfo .unset{color:var(--warn)}
 .brand{font:700 1rem var(--display);letter-spacing:.06em;color:var(--accent);margin-bottom:2px}
 .site-foot{margin-top:18px;display:flex;flex-direction:column;gap:6px;max-width:75ch}
 .site-foot p{margin:0}
@@ -72,6 +74,10 @@ h2{font-size:1.15rem;text-transform:uppercase;letter-spacing:.06em;color:var(--m
 .verdict{display:flex;align-items:center;justify-content:center;padding:10px 16px;font:700 1.15rem var(--display);letter-spacing:.08em;text-transform:uppercase;min-width:132px;text-align:center;line-height:1.05}
 .verdict.ok{background:var(--ok-bg);color:var(--ok)}
 .verdict.bad{background:var(--bad-bg);color:var(--bad)}
+.verdict.pending{background:var(--field);color:var(--warn)}
+.reason{grid-column:1/-1;padding:7px 14px;font-size:.86rem;line-height:1.35;border-top:1px solid var(--line);background:var(--bad-bg);color:var(--bad)}
+.reason b{font-weight:700}
+.reason.pending{background:var(--field);color:var(--warn)}
 .readouts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 12px;padding:8px 14px;align-items:center}
 .ro b{display:block;font:500 .68rem var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 .ro span{font-family:var(--mono);font-size:1rem;font-variant-numeric:tabular-nums}
@@ -98,6 +104,7 @@ h2{font-size:1.15rem;text-transform:uppercase;letter-spacing:.06em;color:var(--m
 .seatgroup{border-top:1px dashed var(--line);padding-top:8px}
 .seatgroup:first-child{border-top:0;padding-top:0}
 .seatwarn{color:var(--bad);font-size:.78rem;font-weight:600}
+.name-in{grid-column:1/-1;font:inherit;font-size:16px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
 
 /* fuel */
 .fuel{display:flex;flex-direction:column;gap:10px}
@@ -122,6 +129,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
 .legend .to{background:var(--ink)}
 .legend .zf{border:2px solid var(--ink)}
+.legend .ldg{background:var(--ink);border-radius:1px;width:9px;height:9px;transform:rotate(45deg)}
 
 /* checks */
 .checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
@@ -129,6 +137,11 @@ input[type=range]{width:100%;accent-color:var(--accent);height:28px}
 .checks li::before{content:"✓";font-weight:700;color:var(--ok);text-align:center}
 .checks li.bad::before{content:"✕";color:var(--bad)}
 .checks li.bad{color:var(--bad);font-weight:500}
+.checks li.warn::before{content:"!";color:var(--warn)}
+.checks li.warn{color:var(--warn);font-weight:500}
+.fixes{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:10px 12px;background:var(--field)}
+.fixes h3{font-size:1rem;text-transform:uppercase;letter-spacing:.06em;margin:0 0 6px}
+.fixes ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:.88rem}
 .checks .num{font-size:.82rem}
 
 /* table */
@@ -147,9 +160,9 @@ tr.total td{font-weight:600;border-top:2px solid var(--ink);background:var(--fie
 .field{display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted)}
 .field input,.field textarea,.field select{font:inherit;font-size:16px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0;max-width:100%}
 /* iOS gives date inputs a large intrinsic size and centered text; flatten it to match the other fields */
-.field input[type=datetime-local]{-webkit-appearance:none;appearance:none;height:42px;line-height:22px;text-align:left;display:block}
-.field input[type=datetime-local]::-webkit-date-and-time-value{text-align:left;margin:0}
-.field input[type=datetime-local]::-webkit-datetime-edit{padding:0}
+.field input[type=datetime-local],.field input[type=date]{-webkit-appearance:none;appearance:none;height:42px;line-height:22px;text-align:left;display:block}
+.field input[type=datetime-local]::-webkit-date-and-time-value,.field input[type=date]::-webkit-date-and-time-value{text-align:left;margin:0}
+.field input[type=datetime-local]::-webkit-datetime-edit,.field input[type=date]::-webkit-datetime-edit{padding:0}
 
 /* passenger manifest */
 .mf{display:flex;flex-direction:column;gap:10px}
@@ -173,11 +186,24 @@ tr.total td{font-weight:600;border-top:2px solid var(--ink);background:var(--fie
 
 /* fleet editor */
 .fleet{display:flex;flex-direction:column;gap:12px}
-.ac{border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) auto;gap:8px;align-items:end;background:var(--field)}
+.ac{border:1px solid var(--line);border-radius:8px;padding:10px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr)) auto;gap:8px;align-items:end;background:var(--field)}
 .ac .field input,.ac .field select{background:var(--panel)}
 @media (max-width:700px){.ac{grid-template-columns:repeat(2,minmax(0,1fr))}.ac .del{grid-column:1/-1}}
 details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);list-style-position:inside}
 .foot{color:var(--muted);font-size:.78rem;margin-top:18px;max-width:75ch}
+details.panel>summary{list-style-position:inside}
+
+/* phones: Send/Print stay reachable at the bottom of the screen */
+.sendbar{display:none}
+@media (max-width:880px){
+  .sendbar{display:flex;flex-direction:column;gap:6px;position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -2px 10px rgba(0,0,0,.08);
+    padding:8px max(16px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+  .sendbar .actions{flex-wrap:nowrap}
+  .sendbar .btn{flex:1 1 0;padding:10px 12px}
+  .sendbar .msg{min-height:0;font-size:.8rem}
+  .send-panel .actions{display:none}
+  .wrap{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+}
 
 /* printing shows only the report built into #printReport, laid out like the PDF */
 #printReport{display:none}
@@ -225,6 +251,7 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
       <div class="brand">AeroStratsLLC</div>
       <h1 id="title">Robinson Weight &amp; Balance</h1>
       <div class="sub" id="subtitle">Pick an aircraft, enter loads, check the envelope.</div>
+      <div class="acinfo" id="acinfo"></div>
     </div>
     <div class="top-actions">
       <div class="tails" id="tails" role="group" aria-label="Aircraft"></div>
@@ -240,6 +267,7 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
       <div class="ro"><b>Lat. CG</b><span id="roLat">–</span></div>
       <div class="ro"><b>Margin to max</b><span id="roMargin">–</span></div>
     </div>
+    <div class="reason" id="reason" hidden></div>
   </div>
 
   <div class="grid">
@@ -257,9 +285,14 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
             <div class="stepper"><button type="button" data-fuel="-1" aria-label="Less main fuel">−</button><input id="mainGal" type="number" inputmode="decimal" step="0.1" min="0" aria-label="Main fuel gallons"><button type="button" data-fuel="1" aria-label="More main fuel">+</button></div>
           </div>
           <label class="toggle" id="auxToggle"><input type="checkbox" id="auxAuto" checked> Aux fuel follows main (interconnected tanks)</label>
+          <p class="hint" id="auxHint" style="margin:0">The main and aux tanks fill and drain together, so the aux quantity is estimated from the main gallons. Untick to enter aux separately.</p>
           <div class="fuelline" id="auxManual" hidden>
             <span class="hint">Aux gallons</span>
             <div class="stepper"><button type="button" data-aux="-1" aria-label="Less aux fuel">−</button><input id="auxGal" type="number" inputmode="decimal" step="0.1" min="0" aria-label="Aux fuel gallons"><button type="button" data-aux="1" aria-label="More aux fuel">+</button></div>
+          </div>
+          <div class="fuelline">
+            <label class="hint" for="burn">Fuel burn for the 20-min landing reserve (gal/hr)</label>
+            <div class="stepper"><button type="button" data-burn="-1" aria-label="Lower fuel burn">−</button><input id="burn" type="number" inputmode="decimal" step="0.5" min="1"><button type="button" data-burn="1" aria-label="Higher fuel burn">+</button></div>
           </div>
           <div class="gauge" id="fuelGauge"></div>
         </div>
@@ -273,14 +306,14 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
       <section class="panel">
         <h2>Flight details</h2>
         <div class="fields">
-          <label class="field">Pilot in command<input id="pilot" autocomplete="name" placeholder="Name"></label>
           <label class="field">Date / time<input id="when" type="datetime-local"></label>
           <label class="field wide">Notes<textarea id="notes" placeholder="Route, purpose, ballast, etc."></textarea></label>
         </div>
       </section>
 
       <section class="panel">
-        <div class="panel-h"><h2>Passenger manifest</h2><button class="btn small" id="mfClear" type="button">Clear names</button></div>
+        <div class="panel-h"><h2>Passenger manifest</h2><button class="btn small" id="mfClear" type="button">Clear passengers</button></div>
+        <p class="hint" style="margin:0">Names and weights come from Occupants &amp; baggage above. Emergency contacts are optional.</p>
         <div class="mf" id="manifest"></div>
       </section>
     </div>
@@ -289,7 +322,7 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
       <section class="panel">
         <div class="panel-h"><h2>Longitudinal CG envelope</h2></div>
         <canvas class="chart" id="chartLong" role="img" aria-label="Gross weight versus longitudinal CG chart"></canvas>
-        <div class="legend"><span><i class="to"></i>Takeoff</span><span><i class="zf"></i>Zero usable fuel</span><span>Line = fuel burn</span></div>
+        <div class="legend"><span><i class="to"></i>Takeoff</span><span><i class="ldg"></i>Landing (20 min fuel)</span><span><i class="zf"></i>Zero usable fuel</span><span>Line = fuel burn</span></div>
       </section>
       <section class="panel">
         <div class="panel-h"><h2>Lateral CG envelope</h2><span class="hint">+ = right side</span></div>
@@ -297,13 +330,14 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
       </section>
       <section class="panel">
         <h2>Limit checks</h2>
+        <div class="fixes" id="fixes" hidden><h3>How to fix</h3><ul id="fixList"></ul></div>
         <ul class="checks" id="checks"></ul>
       </section>
-      <section class="panel">
-        <h2>Loading summary</h2>
+      <details class="panel" id="tableBox">
+        <summary>Loading summary</summary>
         <div class="tbl-wrap"><table id="table"></table></div>
-      </section>
-      <section class="panel">
+      </details>
+      <section class="panel send-panel">
         <h2>Send</h2>
         <p class="hint" style="margin:0">Verify these results against the POH and the aircraft's weight &amp; balance record before flight.</p>
         <div class="actions" id="actions">
@@ -337,12 +371,21 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
     </details>
   </section>
 
+  <div class="sendbar" id="sendbar">
+    <div class="msg" id="barMsg"></div>
+    <div class="actions">
+      <button class="btn primary" id="barSend" type="button">Send W&amp;B (PDF)</button>
+      <button class="btn" id="barPrint" type="button">Print</button>
+    </div>
+  </div>
+
   <div id="printReport" aria-hidden="true"></div>
 
   <footer class="site-foot">
     <p class="disclaimer"><b>Verify before flight.</b> This tool is a planning aid. Check every result against the aircraft's POH and current weight &amp; balance record. The pilot in command is responsible for safe loading.</p>
     <p class="foot" style="margin:0">Limits and arms are from the Robinson R22, R44, R44 Cadet, R44 II and R66 Pilot's Operating Handbooks (Sections 2 and 6, rev. 2014–2024). Empty weight and CG come from each aircraft's own weight &amp; balance record.</p>
     <p class="brand-foot">© 2026 Aeronautical Solutions and Strategies LLC</p>
+    <p class="hint" id="versionLine"></p>
   </footer>
 </div>
 
@@ -351,13 +394,13 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
 /* ---------- aircraft models (POH data) ---------- */
 const MODELS = {
   R22: {
-    name: "R22 Beta II", maxGross: 1370, minGross: 920, seatMax: 240, bagMax: 50, fuelLb: 6, fuelName: "Avgas",
+    name: "R22 Beta II", maxGross: 1370, minGross: 920, seatMax: 240, bagMax: 50, fuelLb: 6, fuelName: "Avgas", burn: 9,
     main: { usable: 16.9, arm: 108.6, lat: -11.0 },
     aux:  { usable: 9.4,  arm: 103.8, lat: 11.2 },
     // aux gallons vs main gallons, from the N7187K worksheet table
     auxTable: [[3.5,0],[4,0.2],[5,1],[6,1.7],[7,2.4],[8,3],[9,3.7],[10,4.3],[11,5],[12,5.7],[13,6.3],[14,7],[15,7.7],[16,8.4],[16.9,9.4]],
     stations: [
-      { key: "pilot", label: "Pilot (right seat)", arm: 78.0, lat: 10.7, seat: "R", def: 170 },
+      { key: "pilot", label: "Pilot (right seat)", arm: 78.0, lat: 10.7, seat: "R" },
       { key: "bagR",  label: "Baggage under right seat", arm: 78.0, lat: 10.7, seat: "R", bag: true },
       { key: "pax",   label: "Passenger (left seat)", arm: 78.0, lat: -9.3, seat: "L" },
       { key: "bagL",  label: "Baggage under left seat", arm: 78.0, lat: -9.3, seat: "L", bag: true }
@@ -375,13 +418,13 @@ const MODELS = {
     axes: { x: [95,103,1], y: [900,1400,100], lat: [-3,3,1] }
   },
   R44: {
-    name: "R44 Raven I", maxGross: 2400, minGross: 1550, seatMax: 300, bagMax: 50, fuelLb: 6, fuelName: "Avgas",
+    name: "R44 Raven I", maxGross: 2400, minGross: 1550, seatMax: 300, bagMax: 50, fuelLb: 6, fuelName: "Avgas", burn: 15,
     main: { usable: 29.5, arm: 106.0, lat: -13.5 },
     aux:  { usable: 17.0, arm: 102.0, lat: 13.0 },
     // aux gallons vs main gallons, from the N931QA worksheet table
     auxTable: [[7,0],[8,0.8],[9,1.5],[10,2.3],[11,3],[12,3.8],[13,4.5],[14,5.3],[15,6],[16,6.8],[17,7.6],[18,8.3],[19,9.1],[20,9.8],[21,10.6],[22,11.3],[23,12.1],[24,12.8],[25,13.6],[26,14.4],[27,15.1],[28,15.9],[29,16.7],[29.5,17]],
     stations: [
-      { key: "pilot", label: "Pilot (front right)", arm: 49.5, lat: 12.2, seat: "FR", def: 175 },
+      { key: "pilot", label: "Pilot (front right)", arm: 49.5, lat: 12.2, seat: "FR" },
       { key: "bagFR", label: "Baggage under front right", arm: 44.0, lat: 11.5, seat: "FR", bag: true },
       { key: "fl",    label: "Passenger front left", arm: 49.5, lat: -10.4, seat: "FL" },
       { key: "bagFL", label: "Baggage under front left", arm: 44.0, lat: -11.5, seat: "FL", bag: true },
@@ -409,7 +452,7 @@ const MODELS = {
 // higher weights, one combined removable-controls item, and accessory mount bars.
 MODELS.R44II = {
   ...MODELS.R44,
-  name: "R44 II", maxGross: 2500, minGross: 1600,
+  name: "R44 II", maxGross: 2500, minGross: 1600, burn: 16,
   stations: [
     ...MODELS.R44.stations,
     { key: "accR", label: "Accessory mount bar (right)", arm: 25.0, lat: 14.0 },
@@ -424,11 +467,11 @@ MODELS.R44II = {
 };
 // R66 (POH Sections 2 & 6, rev. 2022): five seats, a 300 lb baggage compartment, one Jet A tank (no aux).
 MODELS.R66 = {
-  name: "R66", maxGross: 2700, minGross: 1400, seatMax: 300, bagMax: 50, fuelLb: 6.7, fuelName: "Jet A",
+  name: "R66", maxGross: 2700, minGross: 1400, seatMax: 300, bagMax: 50, fuelLb: 6.7, fuelName: "Jet A", burn: 23,
   main: { usable: 73.6, arm: 102.5, lat: -3.0 },
   aux: null,
   stations: [
-    { key: "pilot", label: "Pilot (front right)", arm: 49.0, lat: 12.2, seat: "FR", def: 170 },
+    { key: "pilot", label: "Pilot (front right)", arm: 49.0, lat: 12.2, seat: "FR" },
     { key: "bagFR", label: "Baggage under front right", arm: 42.0, lat: 12.2, seat: "FR", bag: true },
     { key: "fl",    label: "Passenger front left", arm: 49.0, lat: -12.2, seat: "FL" },
     { key: "bagFL", label: "Baggage under front left", arm: 42.0, lat: -12.2, seat: "FL", bag: true },
@@ -457,10 +500,10 @@ MODELS.R66 = {
 // (50 lb each, per side) in place of rear seats. Envelope is the R44's cut off at 2200 lb.
 MODELS.R44C = {
   ...MODELS.R44II,
-  name: "R44 Cadet", maxGross: 2200, minGross: 1550,
+  name: "R44 Cadet", maxGross: 2200, minGross: 1550, burn: 15,
   bagNote: "50 lb per compartment and per side of aft deck",
   stations: [
-    { key: "pilot", label: "Pilot (right seat)", arm: 49.5, lat: 12.2, seat: "R", def: 175 },
+    { key: "pilot", label: "Pilot (right seat)", arm: 49.5, lat: 12.2, seat: "R" },
     { key: "bagR",  label: "Baggage under right seat", arm: 44.0, lat: 11.5, seat: "R", bag: true },
     { key: "pax",   label: "Passenger (left seat)", arm: 49.5, lat: -10.4, seat: "L" },
     { key: "bagL",  label: "Baggage under left seat", arm: 44.0, lat: -11.5, seat: "L", bag: true },
@@ -479,9 +522,14 @@ MODELS.R44C = {
 /* Built-in fleet: always taken from this file, so a reweigh published here reaches every phone.
    Empty-weight moments as recorded in the worksheets. */
 const BUILTIN_FLEET = [
-  { id: "N7187K", tail: "N7187K", model: "R22", bew: 895.2,  arm: 92706 / 895.2,   lat: -354 / 895.2 },
-  { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2 }
+  // wbDate: date of the aircraft's current weight & balance record (YYYY-MM-DD); blank until provided
+  { id: "N7187K", tail: "N7187K", model: "R22", bew: 895.2,  arm: 92706 / 895.2,   lat: -354 / 895.2,      wbDate: "" },
+  { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "" }
 ];
+// APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
+const APP_BUILD = "20261109230841";
+const DATA_UPDATED = "2026-10-26";
+const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
 const RETIRED_IDS = ["R44II-EX"]; // the old R44 II POH example
 // R22s before R44s, then by tail number
@@ -498,7 +546,9 @@ const S = {
   fleet: [],                          // built-in + custom, rebuilt by rebuildFleet()
   tailId: store.get("tail", null),
   loads: store.get("loads", {}),
-  pilot: store.get("pilot", "")
+  pilot: store.get("pilot", ""),       // PIC name on this phone
+  pilotWt: store.get("pilotWt", 0),    // last pilot weight entered on this phone; 0 = ask
+  burn: store.get("burn", {})          // fuel burn (gal/hr) per aircraft id, when changed from the model default
 };
 // phones from before this change kept the whole fleet under "fleet": keep only what the pilot added
 if (!S.custom) S.custom = (store.get("fleet", []) || []).filter(a => !isBuiltin(a.id) && !RETIRED_IDS.includes(a.id));
@@ -515,14 +565,18 @@ const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; }
 const ac = () => S.fleet.find(a => a.id === S.tailId);
 const model = () => MODELS[ac().model];
 
+const burnRate = a => S.burn[a.id] || MODELS[a.model].burn;
 function freshLoad(m) {
-  const st = {}; m.stations.forEach(s => st[s.key] = s.def || 0);
+  // no assumed pilot weight: use this phone's last entry, otherwise leave it for the pilot to enter
+  const st = {}; m.stations.forEach(s => st[s.key] = s.key === "pilot" ? (S.pilotWt || 0) : 0);
   return { st, rm: {}, main: m.main.usable, auxAuto: true, aux: m.aux ? m.aux.usable : 0, mf: {} };
 }
 function load() {
   const a = ac(), m = model();
   if (!S.loads[a.id]) S.loads[a.id] = freshLoad(m);
   if (!S.loads[a.id].mf) S.loads[a.id].mf = {};
+  // an empty pilot seat picks up the weight this phone's pilot entered elsewhere
+  if (!num(S.loads[a.id].st.pilot) && S.pilotWt) S.loads[a.id].st.pilot = S.pilotWt;
   return S.loads[a.id];
 }
 const pilotSeat = m => m.stations.find(s => s.key === "pilot").seat;
@@ -536,7 +590,7 @@ function manifestRows() {
     return { seat: k, label: m.seats[k], pic: k === ps, name: k === ps ? S.pilot : (e.name || ""), contact: e.contact || "", person, bag };
   });
 }
-function saveState() { store.set("custom", S.custom); store.set("tail", S.tailId); store.set("loads", S.loads); store.set("pilot", S.pilot); }
+function saveState() { store.set("custom", S.custom); store.set("tail", S.tailId); store.set("loads", S.loads); store.set("pilot", S.pilot); store.set("pilotWt", S.pilotWt); store.set("burn", S.burn); }
 
 /* ---------- math ---------- */
 function auxFromMain(m, g) {
@@ -561,8 +615,19 @@ function rangeAt(poly, v, axis) {
 }
 const inRange = (r, v) => r && v >= r[0] - 1e-6 && v <= r[1] + 1e-6;
 
-function compute() {
-  const a = ac(), m = model(), L = load();
+// split `total` gallons between main and aux the way the tanks drain together
+function splitFuel(m, L, total) {
+  if (!m.aux) return [total, 0];
+  if (!L.auxAuto) {
+    const mg = Math.min(Math.max(L.main, 0), m.main.usable), ag = auxGal(m, L), t = mg + ag;
+    return t > 0 ? [total * mg / t, total * ag / t] : [0, 0];
+  }
+  let lo = 0, hi = m.main.usable;
+  for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; if (mid + auxFromMain(m, mid) < total) lo = mid; else hi = mid; }
+  return [hi, auxFromMain(m, hi)];
+}
+
+function compute(L = load(), a = ac(), m = MODELS[a.model]) {
   const rows = [];
   const add = (label, w, arm, lat, kind) => rows.push({ label, w, arm, lat, lm: w * arm, tm: w * lat, kind });
   add("Basic empty weight", a.bew, a.arm, a.lat, "bew");
@@ -571,32 +636,80 @@ function compute() {
   const sum = list => { const w = list.reduce((t, r) => t + r.w, 0), lm = list.reduce((t, r) => t + r.lm, 0), tm = list.reduce((t, r) => t + r.tm, 0); return { w, lm, tm, cg: lm / w, lcg: tm / w }; };
   const zf = sum(rows);
   const mainG = Math.min(Math.max(L.main, 0), m.main.usable), auxG = auxGal(m, L);
-  const fuelRows = [];
-  const fadd = (label, g, t) => { const w = g * m.fuelLb; fuelRows.push({ label: `${label} (${fmt(g)} gal)`, w, arm: t.arm, lat: t.lat, lm: w * t.arm, tm: w * t.lat, kind: "fuel" }); };
-  if (m.aux) { fadd("Main fuel", mainG, m.main); fadd("Aux fuel", auxG, m.aux); }
-  else fadd(`Fuel, ${m.fuelName}`, mainG, m.main);
+  const fuelFor = (mg, ag) => {
+    const out = [], f = (label, g, t) => { const w = g * m.fuelLb; out.push({ label: `${label} (${fmt(g)} gal)`, w, arm: t.arm, lat: t.lat, lm: w * t.arm, tm: w * t.lat, kind: "fuel" }); };
+    if (m.aux) { f("Main fuel", mg, m.main); f("Aux fuel", ag, m.aux); } else f(`Fuel, ${m.fuelName}`, mg, m.main);
+    return out;
+  };
+  const fuelRows = fuelFor(mainG, auxG);
   const to = sum(rows.concat(fuelRows));
+  // landing: RESERVE_MIN minutes of fuel left at this aircraft's burn rate (or all of it, if less was loaded)
+  const burn = burnRate(a), reserveG = burn * RESERVE_MIN / 60, totalG = mainG + auxG, landG = Math.min(reserveG, totalG);
+  const landRows = fuelFor(...splitFuel(m, L, landG));
+  const ld = sum(rows.concat(landRows));
 
+  // each check has a full line for the checks list and a short reason for the status strip
   const checks = [];
-  const chk = (ok, text) => checks.push({ ok, text });
-  chk(to.w <= m.maxGross + 1e-9, `Takeoff weight ${fmt(to.w)} lb, max ${m.maxGross} lb` + (to.w > m.maxGross ? ` (over by ${fmt(to.w - m.maxGross)} lb)` : ""));
-  chk(zf.w >= m.minGross - 1e-9, `Zero-fuel weight ${fmt(zf.w)} lb, min ${m.minGross} lb`);
+  const chk = (ok, text, short) => checks.push({ ok, text, short });
+  chk(to.w <= m.maxGross + 1e-9, `Takeoff weight ${fmt(to.w)} lb, max ${m.maxGross} lb` + (to.w > m.maxGross ? ` (over by ${fmt(to.w - m.maxGross)} lb)` : ""),
+      `Over max gross by ${fmt(to.w - m.maxGross)} lb`);
+  chk(zf.w >= m.minGross - 1e-9, `Zero-fuel weight ${fmt(zf.w)} lb, min ${m.minGross} lb`, `Below min gross weight by ${fmt(m.minGross - zf.w)} lb`);
   const pt = (p, name) => {
     const r = rangeAt(m.envLong, p.w, 1);
     chk(inRange(r, p.cg), r ? `${name} long. CG ${fmt(p.cg, 2)} in, limits at ${fmt(p.w, 0)} lb: ${fmt(r[0], 2)} – ${fmt(r[1], 2)} in`
-                             : `${name} weight ${fmt(p.w)} lb is outside the envelope's weight range`);
+                             : `${name} weight ${fmt(p.w)} lb is outside the envelope's weight range`,
+        !r ? `${name} weight outside the envelope`
+           : p.cg > r[1] ? `${name} CG ${fmt(p.cg - r[1], 2)} in aft of limit` : `${name} CG ${fmt(r[0] - p.cg, 2)} in forward of limit`);
     const rl = rangeAt(m.envLat, p.cg, 0);
     chk(inRange(rl, p.lcg), rl ? `${name} lat. CG ${latStr(p.lcg)}, limits at ${fmt(p.cg, 1)} in: ${latStr(rl[0])} to ${latStr(rl[1])}`
-                               : `${name} lat. CG cannot be checked: long. CG ${fmt(p.cg, 2)} in is outside ${m.envLat[0][0]}–${Math.max(...m.envLat.map(q => q[0]))} in`);
+                               : `${name} lat. CG cannot be checked: long. CG ${fmt(p.cg, 2)} in is outside ${m.envLat[0][0]}–${Math.max(...m.envLat.map(q => q[0]))} in`,
+        !rl ? `${name} CG off the lateral chart` : `${name} lateral CG too far ${p.lcg > rl[1] ? "right" : "left"}`);
   };
-  pt(to, "Takeoff"); pt(zf, "Zero-fuel");
+  pt(to, "Takeoff"); pt(ld, `Landing (${RESERVE_MIN} min fuel)`); pt(zf, "Zero-fuel");
   Object.keys(m.seats).forEach(k => {
     const w = m.stations.filter(s => s.seat === k).reduce((t, s) => t + num(L.st[s.key]), 0);
-    if (w > m.seatMax) chk(false, `${m.seats[k]} ${fmt(w, 0)} lb incl. baggage, max ${m.seatMax} lb`);
+    if (w > m.seatMax) chk(false, `${m.seats[k]} ${fmt(w, 0)} lb incl. baggage, max ${m.seatMax} lb`, `${m.seats[k]} over ${m.seatMax} lb`);
   });
-  m.stations.filter(s => s.bag).forEach(s => { const w = num(L.st[s.key]), mx = s.max || m.bagMax; if (w > mx) chk(false, `${s.label} ${fmt(w, 0)} lb, max ${mx} lb`); });
-  if (num(L.st.pilot) <= 0) chk(false, "Enter a pilot weight");
-  return { rows, fuelRows, zf, to, checks, ok: checks.every(c => c.ok), mainG, auxG };
+  m.stations.filter(s => s.bag).forEach(s => { const w = num(L.st[s.key]), mx = s.max || m.bagMax; if (w > mx) chk(false, `${s.label} ${fmt(w, 0)} lb, max ${mx} lb`, `${s.label} over ${mx} lb`); });
+  // not a W&B limit, so it warns without failing the loading
+  if (totalG + 1e-9 < reserveG) checks.push({ ok: false, warn: true, text: `Takeoff fuel ${fmt(totalG)} gal is less than the ${RESERVE_MIN}-min reserve (${fmt(reserveG)} gal at ${burn} gal/hr)`, short: `Fuel below the ${RESERVE_MIN}-min reserve` });
+  return { rows, fuelRows, landRows, zf, to, ld, checks, ok: checks.every(c => c.ok || c.warn), incomplete: num(L.st.pilot) <= 0,
+           mainG, auxG, burn, reserveG, landG };
+}
+
+// Fix ideas for an out-of-limits loading, each tested with compute() on a copy of the loading.
+function suggestFixes() {
+  if (R.ok || R.incomplete) return [];
+  const a = ac(), m = model(), L = load(), out = [];
+  const copy = () => ({ ...L, st: { ...L.st }, rm: { ...L.rm } });
+  const passes = T => compute(T, a, m).ok;
+  if (R.to.w > m.maxGross + 1e-9) out.push(`Remove at least ${fmt(R.to.w - m.maxGross)} lb (people, baggage or fuel).`);
+  // most fuel that keeps everything in limits
+  for (let g = +(Math.min(L.main, m.main.usable) - 0.1).toFixed(1); g >= 0; g = +(g - 0.1).toFixed(1)) {
+    const T = copy(); T.main = g;
+    if (!passes(T)) continue;
+    const tot = g + (m.aux ? auxGal(m, T) : 0), low = tot + 1e-9 < R.reserveG;
+    out.push(`Reduce fuel to ${fmt(g)} gal${m.aux ? ` main (${fmt(tot)} gal total)` : ""}${low ? `, which is below the ${RESERVE_MIN}-min reserve` : ""}.`);
+    break;
+  }
+  // smallest weight added at the most forward (left side) and most aft compartments
+  const bags = m.stations.filter(s => s.bag);
+  const fwd = bags.filter(s => s.lat <= 0).sort((p, q) => p.arm - q.arm)[0];
+  const aft = bags.slice().sort((p, q) => q.arm - p.arm)[0];
+  const tryAdd = s => {
+    const have = num(L.st[s.key]), room = (s.max || m.bagMax) - have;
+    for (let w = 1; w <= room; w++) { const T = copy(); T.st[s.key] = have + w; if (passes(T)) { out.push(`Add ${w} lb of ballast or baggage to ${s.label.toLowerCase()}.`); return; } }
+  };
+  const tested = out.length - (R.to.w > m.maxGross + 1e-9 ? 1 : 0);
+  if (fwd) tryAdd(fwd);
+  if (aft && (!fwd || aft.arm > fwd.arm + 1)) tryAdd(aft);
+  // nothing above fixes it on its own: point the pilot in the right direction
+  if (out.length - (R.to.w > m.maxGross + 1e-9 ? 1 : 0) === 0 && tested === 0) {
+    const bad = R.checks.filter(c => !c.ok && !c.warn).map(c => c.short).join(" ");
+    const dir = /forward of limit/.test(bad) ? " Move weight aft." : /aft of limit/.test(bad) ? " Move weight forward." : /lateral/.test(bad) ? " Balance weight left and right." : "";
+    out.push(`No single fuel or baggage change fixes the CG.${dir || " Move weight between seats or reduce the load."}`);
+  }
+  return out;
 }
 const latStr = v => (Math.abs(v) < 0.005 ? "0.00" : fmt(Math.abs(v), 2) + (v > 0 ? " R" : " L"));
 
@@ -630,29 +743,50 @@ function drawChart(ctx, W, H, o, P) {
   ctx.fillStyle = P.envFill; ctx.fill(); ctx.strokeStyle = P.env; ctx.lineWidth = 2.5; ctx.stroke();
   // burn line + points (clamped into plot so off-chart points still show at the edge)
   const cx = v => Math.min(Math.max(v, x0), x1), cy = v => Math.min(Math.max(v, y0), y1);
-  const [zf, to] = o.pts;
-  ctx.strokeStyle = P.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(cx(zf.x)), Y(cy(zf.y))); ctx.lineTo(X(cx(to.x)), Y(cy(to.y))); ctx.stroke();
-  o.pts.forEach(p => {
-    const c = p.ok ? P.ok : P.bad, px = X(cx(p.x)), py = Y(cy(p.y));
-    ctx.beginPath(); ctx.arc(px, py, 6.5, 0, Math.PI * 2);
-    if (p.hollow) { ctx.fillStyle = P.bg; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = c; ctx.stroke(); }
+  // points in fuel order (zero fuel → landing → takeoff), joined by the fuel-burn line
+  const pts = o.pts.map(p => ({ ...p, px: X(cx(p.x)), py: Y(cy(p.y)) }));
+  ctx.strokeStyle = P.ink; ctx.lineWidth = 1.5; ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(p.px, p.py) : ctx.moveTo(p.px, p.py)); ctx.stroke();
+  pts.forEach(p => {
+    const c = p.ok ? P.ok : P.bad, { px, py } = p;
+    ctx.beginPath();
+    if (p.shape === "diamond") { ctx.moveTo(px, py - 7); ctx.lineTo(px + 7, py); ctx.lineTo(px, py + 7); ctx.lineTo(px - 7, py); ctx.closePath(); }
+    else ctx.arc(px, py, 6.5, 0, Math.PI * 2);
+    if (p.shape === "hollow") { ctx.fillStyle = P.bg; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = c; ctx.stroke(); }
     else { ctx.fillStyle = c; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = P.bg; ctx.stroke(); }
-    ctx.fillStyle = c; ctx.font = `600 12px ${P.font}`; ctx.textBaseline = "middle";
-    const right = px < (W - pad.r - 40); ctx.textAlign = right ? "left" : "right";
-    ctx.fillText(p.label, px + (right ? 10 : -10), py + (p.hollow ? 12 : -12));
-    ctx.font = `12px ${P.font}`;
   });
+  // labels: first candidate spot that stays in the plot and clear of the markers and earlier labels
+  ctx.font = `600 12px ${P.font}`; ctx.textBaseline = "middle"; ctx.textAlign = "left";
+  const taken = pts.map(p => [p.px - 8, p.py - 8, p.px + 8, p.py + 8]);
+  const clash = b => taken.some(q => b[0] < q[2] && b[2] > q[0] && b[1] < q[3] && b[3] > q[1]);
+  pts.slice().reverse().forEach(p => {
+    const w = ctx.measureText(p.label).width;
+    const spots = [[10, -12], [10, 12], [-10 - w, -12], [-10 - w, 12], [11, 0], [-11 - w, 0], [-w / 2, -20], [-w / 2, 20], [16, -24], [-16 - w, 24]];
+    let pick = null;
+    for (const [dx, dy] of spots) {
+      const x = p.px + dx, y = p.py + dy, b = [x - 2, y - 8, x + w + 2, y + 8];
+      if (b[0] < pad.l || b[2] > W - 2 || b[1] < 0 || b[3] > H - pad.b) continue;
+      if (!clash(b)) { pick = [x, y, b]; break; }
+    }
+    if (!pick) { const x = p.px + 10, y = p.py - 12; pick = [x, y, [x, y - 8, x + w, y + 8]]; }
+    ctx.fillStyle = p.ok ? P.ok : P.bad; ctx.fillText(p.label, pick[0], pick[1]); taken.push(pick[2]);
+  });
+  ctx.font = `12px ${P.font}`;
 }
 function chartOpts(m, R, kind) {
   const okLong = p => inRange(rangeAt(m.envLong, p.w, 1), p.cg), okLat = p => inRange(rangeAt(m.envLat, p.cg, 0), p.lcg);
   if (kind === "long") return {
     x: m.axes.x, y: m.axes.y, poly: m.envLong, xLabel: "Longitudinal CG (in. from datum)", yLabel: "Gross weight (lb)",
-    pts: [{ x: R.zf.cg, y: R.zf.w, ok: okLong(R.zf), hollow: true, label: "ZF" }, { x: R.to.cg, y: R.to.w, ok: okLong(R.to), label: "TO" }]
+    pts: [{ x: R.zf.cg, y: R.zf.w, ok: okLong(R.zf), shape: "hollow", label: "ZF" },
+          { x: R.ld.cg, y: R.ld.w, ok: okLong(R.ld), shape: "diamond", label: "LDG" },
+          { x: R.to.cg, y: R.to.w, ok: okLong(R.to), label: "TO" }]
   };
   return {
     x: m.axes.x, y: m.axes.lat, poly: m.envLat, xLabel: "Longitudinal CG (in. from datum)", yLabel: "Lateral CG (in.)", zeroLine: true,
     yFmt: v => v === 0 ? "0" : Math.abs(v) + (v > 0 ? "R" : "L"),
-    pts: [{ x: R.zf.cg, y: R.zf.lcg, ok: okLat(R.zf), hollow: true, label: "ZF" }, { x: R.to.cg, y: R.to.lcg, ok: okLat(R.to), label: "TO" }]
+    pts: [{ x: R.zf.cg, y: R.zf.lcg, ok: okLat(R.zf), shape: "hollow", label: "ZF" },
+          { x: R.ld.cg, y: R.ld.lcg, ok: okLat(R.ld), shape: "diamond", label: "LDG" },
+          { x: R.to.cg, y: R.to.lcg, ok: okLat(R.to), label: "TO" }]
   };
 }
 function paintCanvas(cv, o) {
@@ -696,9 +830,20 @@ function renderStations() {
     const g = document.createElement("div"); g.className = "seatgroup rows";
     m.stations.filter(s => s.seat === k).forEach(s => {
       const r = document.createElement("div"); r.className = "row";
-      const id = "st_" + s.key;
+      const id = "st_" + s.key, isPilot = s.key === "pilot";
       r.innerHTML = `<label for="${id}">${s.label}<span class="arm">${fmt(s.arm)} in · ${latStr(s.lat)}</span></label>`;
-      r.append(stepper(id, L.st[s.key], v => { L.st[s.key] = v; update(); }, s.bag ? 1 : 5));
+      r.append(stepper(id, L.st[s.key], v => { L.st[s.key] = v; if (isPilot) S.pilotWt = v; update(); }, s.bag ? 1 : 5));
+      if (isPilot) r.querySelector("input").placeholder = "Enter";
+      if (!s.bag) {
+        // the person's name sits with their weight; the pilot's name is the PIC
+        const n = document.createElement("input");
+        n.className = "name-in"; n.id = "nm_" + k; n.autocomplete = isPilot ? "name" : "off";
+        n.placeholder = isPilot ? "Pilot in command name" : "Passenger name (optional)";
+        n.value = isPilot ? S.pilot : ((L.mf[k] || {}).name || "");
+        n.setAttribute("aria-label", `${m.seats[k]} name`);
+        n.addEventListener("input", () => { if (isPilot) S.pilot = n.value; else (L.mf[k] = L.mf[k] || {}).name = n.value; update(); renderManifest(); });
+        r.append(n);
+      }
       g.append(r);
     });
     const warn = document.createElement("div"); warn.className = "seatwarn"; warn.dataset.seat = k; g.append(warn);
@@ -726,35 +871,33 @@ function renderRemovals() {
     return l;
   }));
 }
+// The manifest lists each seat's person (named in Occupants) and takes an optional emergency contact.
+// Rebuilt only when names change, so a contact being typed keeps its focus.
 function renderManifest() {
   const L = load();
   $("manifest").replaceChildren(...manifestRows().map(r => {
     const d = document.createElement("div"); d.className = "mf-row";
-    d.innerHTML = `<div class="mf-head"><span>${r.label}${r.pic ? " · PIC" : ""}</span><span class="num" data-mfw="${r.seat}"></span></div>
-      <label class="field">Name<input id="mf_name_${r.seat}" autocomplete="off" value="${esc(r.name)}" placeholder="${r.pic ? "Pilot in command" : "Passenger name"}"></label>
-      <label class="field">Emergency contact<input id="mf_contact_${r.seat}" autocomplete="off" inputmode="tel" value="${esc(r.contact)}" placeholder="Name / phone (optional)"></label>`;
-    const [nameIn, contactIn] = d.querySelectorAll("input");
-    nameIn.addEventListener("input", () => {
-      if (r.pic) { S.pilot = nameIn.value; $("pilot").value = nameIn.value; }
-      else (L.mf[r.seat] = L.mf[r.seat] || {}).name = nameIn.value;
-      update();
-    });
-    contactIn.addEventListener("input", () => { (L.mf[r.seat] = L.mf[r.seat] || {}).contact = contactIn.value; saveState(); });
+    const who = r.name.trim() ? esc(r.name.trim()) : `<span class="hint">${r.pic ? "PIC name not entered" : "No name"}</span>`;
+    d.innerHTML = `<div class="mf-head"><span>${r.label}${r.pic ? " · PIC" : ""}: ${who}</span><span class="num" data-mfw="${r.seat}"></span></div>
+      <label class="field" style="grid-column:1/-1">Emergency contact<input id="mf_contact_${r.seat}" autocomplete="off" inputmode="tel" value="${esc(r.contact)}" placeholder="Name / phone (optional)"></label>`;
+    d.querySelector("input").addEventListener("input", e => { (L.mf[r.seat] = L.mf[r.seat] || {}).contact = e.target.value; saveState(); });
     return d;
   }));
+  updateManifestWeights();
 }
 function updateManifestWeights() {
   manifestRows().forEach(r => {
     const el = document.querySelector(`[data-mfw="${r.seat}"]`); if (!el) return;
     const missing = r.name.trim() && !r.person;
-    el.textContent = missing ? "Enter weight in loading" : r.person ? `${fmt(r.person, 0)} lb${r.bag ? ` + ${fmt(r.bag, 0)} lb bag` : ""}` : "Empty";
+    el.textContent = missing ? "Enter weight above" : r.person ? `${fmt(r.person, 0)} lb${r.bag ? ` + ${fmt(r.bag, 0)} lb bag` : ""}` : "Empty";
     el.classList.toggle("bad", !!missing);
   });
 }
-$("mfClear").onclick = () => { load().mf = {}; renderManifest(); update(); };
+// clears passenger names and contacts on this aircraft; the PIC and all weights stay
+$("mfClear").onclick = () => { load().mf = {}; renderStations(); renderManifest(); update(); };
 
-// New flight: every aircraft back to default loading (pilot 170/175, full fuel, nothing removed, no passengers);
-// the PIC name stays on this phone.
+// New flight: every aircraft back to a fresh loading (full fuel, nothing removed, no passengers);
+// the PIC name, the phone's pilot weight and fuel-burn settings stay.
 let nfTimer;
 $("newFlight").onclick = e => {
   const b = e.currentTarget; clearTimeout(nfTimer);
@@ -763,7 +906,7 @@ $("newFlight").onclick = e => {
     nfTimer = setTimeout(() => { b.dataset.armed = ""; b.textContent = "New flight"; }, 4000);
     return;
   }
-  S.loads = {}; $("notes").value = ""; $("when").value = nowLocal(); $("actMsg").textContent = "";
+  S.loads = {}; $("notes").value = ""; $("when").value = nowLocal(); $("actMsg").textContent = ""; $("barMsg").textContent = "";
   renderAll();
   b.dataset.armed = ""; b.textContent = "Cleared";
   nfTimer = setTimeout(() => { b.textContent = "New flight"; }, 2000);
@@ -774,7 +917,8 @@ function renderFuel() {
   $("mainRange").max = m.main.usable; $("mainRange").value = L.main;
   $("mainGal").max = m.main.usable; $("mainGal").value = L.main;
   $("fuelHint").textContent = `${m.fuelName} · ${m.fuelLb} lb/gal`;
-  $("auxToggle").hidden = !m.aux;
+  $("burn").value = burnRate(ac());
+  $("auxToggle").hidden = !m.aux; $("auxHint").hidden = !m.aux || !L.auxAuto;
   if (!m.aux) { $("auxManual").hidden = true; return; }
   $("auxGal").max = m.aux.usable; $("auxGal").value = auxGal(m, L);
   $("auxAuto").checked = L.auxAuto; $("auxManual").hidden = L.auxAuto;
@@ -790,12 +934,15 @@ $("auxGal").addEventListener("input", e => setAux(num(e.target.value)));
 $("auxGal").addEventListener("blur", () => { $("auxGal").value = auxGal(model(), load()); });
 document.querySelectorAll("[data-aux]").forEach(b => b.onclick = () => { setAux(load().aux + +b.dataset.aux); $("auxGal").value = load().aux; });
 
-$("pilot").value = S.pilot;
-$("pilot").addEventListener("input", e => {
-  S.pilot = e.target.value;
-  const mi = $("mf_name_" + pilotSeat(model())); if (mi) mi.value = S.pilot;
+// fuel burn for the landing reserve, remembered per aircraft on this phone
+const setBurn = v => {
+  const a = ac(), b = Math.min(Math.max(+(+v).toFixed(1), 1), 60);
+  if (b === MODELS[a.model].burn) delete S.burn[a.id]; else S.burn[a.id] = b;
   update();
-});
+};
+$("burn").addEventListener("input", e => { if (num(e.target.value) > 0) setBurn(num(e.target.value)); });
+$("burn").addEventListener("blur", () => { $("burn").value = burnRate(ac()); });
+document.querySelectorAll("[data-burn]").forEach(b => b.onclick = () => { setBurn(burnRate(ac()) + +b.dataset.burn); $("burn").value = burnRate(ac()); });
 function nowLocal() { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); }
 $("when").value = nowLocal();
 
@@ -805,7 +952,24 @@ function update() {
   const a = ac(), m = model(); R = compute();
   $("title").textContent = `${a.tail} Weight & Balance`;
   $("subtitle").textContent = `Robinson ${m.name} · max gross ${m.maxGross} lb`;
-  const v = $("verdict"); v.className = "verdict " + (R.ok ? "ok" : "bad"); v.innerHTML = R.ok ? "Within<br>limits" : "Out of<br>limits";
+  $("acinfo").innerHTML = `Empty ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in · lat ${latStr(a.lat)} · `
+    + (a.wbDate ? `W&amp;B record ${esc(fmtDate(a.wbDate))}` : `<span class="unset">W&amp;B record date not set</span>`);
+  // verdict: needs a pilot weight first; otherwise in/out of limits with the main reason and a fix
+  const v = $("verdict"), rs = $("reason"), fixes = suggestFixes();
+  const firstBad = R.checks.find(c => !c.ok && !c.warn), firstWarn = R.checks.find(c => c.warn);
+  if (R.incomplete) {
+    v.className = "verdict pending"; v.innerHTML = "Enter<br>pilot wt";
+    rs.className = "reason pending"; rs.hidden = false; rs.textContent = "Enter the pilot's weight in Occupants & baggage to check this loading.";
+  } else if (!R.ok) {
+    v.className = "verdict bad"; v.innerHTML = "Out of<br>limits";
+    rs.className = "reason"; rs.hidden = false;
+    rs.innerHTML = `<b>${esc(firstBad.short)}</b>` + (fixes[0] ? ` · ${esc(fixes[0])}` : "");
+  } else {
+    v.className = "verdict ok"; v.innerHTML = "Within<br>limits";
+    rs.className = "reason pending"; rs.hidden = !firstWarn; if (firstWarn) rs.textContent = firstWarn.short;
+  }
+  $("fixes").hidden = !fixes.length;
+  $("fixList").innerHTML = fixes.map(f => `<li>${esc(f)}</li>`).join("");
   $("roW").textContent = fmt(R.to.w) + " lb";
   $("roCG").textContent = fmt(R.to.cg, 2) + " in";
   $("roLat").textContent = latStr(R.to.lcg);
@@ -813,21 +977,29 @@ function update() {
   $("fuelGauge").innerHTML = m.aux
     ? `<span>Main <span class="num">${fmt(R.mainG)}/${m.main.usable} gal · ${fmt(R.mainG * m.fuelLb)} lb</span></span><span>Aux <span class="num">${fmt(R.auxG)}/${m.aux.usable} gal · ${fmt(R.auxG * m.fuelLb)} lb</span></span><span>Total <span class="num">${fmt((R.mainG + R.auxG) * m.fuelLb)} lb</span></span>`
     : `<span>Fuel <span class="num">${fmt(R.mainG)}/${m.main.usable} gal · ${fmt(R.mainG * m.fuelLb)} lb</span></span>`;
+  $("fuelGauge").innerHTML += `<span>Landing <span class="num">${fmt(R.landG)} gal (${RESERVE_MIN} min at ${R.burn} gal/hr)</span></span>`;
+  $("auxHint").hidden = !m.aux || !load().auxAuto;
   if (m.aux && load().auxAuto && document.activeElement !== $("auxGal")) $("auxGal").value = R.auxG;
   document.querySelectorAll(".seatwarn").forEach(el => {
     const w = m.stations.filter(s => s.seat === el.dataset.seat).reduce((t, s) => t + num(load().st[s.key]), 0);
     el.textContent = w > m.seatMax ? `${fmt(w, 0)} lb on this seat; max ${m.seatMax} lb incl. baggage` : "";
   });
   updateManifestWeights();
-  $("checks").innerHTML = R.checks.map(c => `<li class="${c.ok ? "" : "bad"}"><span>${esc(c.text)}</span></li>`).join("");
+  $("checks").innerHTML = R.checks.map(c => `<li class="${c.ok ? "" : c.warn ? "warn" : "bad"}"><span>${esc(c.text)}</span></li>`).join("");
   const tr = (r, cls = "") => `<tr class="${cls}"><td>${esc(r.label)}</td><td>${fmt(r.w)}</td><td>${fmt(r.arm, 2)}</td><td>${fmt(r.lat, 2)}</td><td>${fmt(r.lm, 0)}</td><td>${fmt(r.tm, 0)}</td></tr>`;
   const tot = (label, t) => tr({ label, w: t.w, arm: t.cg, lat: t.lcg, lm: t.lm, tm: t.tm }, "total");
   $("table").innerHTML = `<thead><tr><th>Item</th><th>Wt lb</th><th>Long. arm</th><th>Lat. arm</th><th>Long. mom</th><th>Lat. mom</th></tr></thead><tbody>`
-    + R.rows.map(r => tr(r)).join("") + tot("Zero usable fuel", R.zf) + R.fuelRows.map(r => tr(r)).join("") + tot("Takeoff", R.to) + "</tbody>";
+    + R.rows.map(r => tr(r)).join("") + tot("Zero usable fuel", R.zf) + R.fuelRows.map(r => tr(r)).join("") + tot("Takeoff", R.to)
+    + tot(`Landing, ${RESERVE_MIN} min fuel (${fmt(R.landG)} gal)`, R.ld) + "</tbody>";
   paintCanvas($("chartLong"), chartOpts(m, R, "long"));
   paintCanvas($("chartLat"), chartOpts(m, R, "lat"));
 }
 function renderAll() { renderTails(); renderStations(); renderRemovals(); renderFuel(); renderManifest(); renderFleet(); update(); }
+const fmtDate = d => { const t = new Date(d + "T12:00:00"); return isNaN(t) ? d : t.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); };
+$("versionLine").textContent = `Version ${APP_BUILD === "dev" ? "preview" : APP_BUILD.replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2}).*/, "$1-$2-$3 $4:$5")}`
+  + ` · Built-in aircraft data updated ${fmtDate(DATA_UPDATED)}`;
+// the loading table is long on a phone; open it by default only on wider screens
+if (window.matchMedia("(min-width: 881px)").matches) $("tableBox").open = true;
 let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(update, 120); });
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", update);
 new MutationObserver(update).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
@@ -844,10 +1016,11 @@ function renderFleet() {
       <label class="field">Empty wt (lb)<input data-f="bew" id="fl_bew_${i}" type="number" inputmode="decimal" step="0.1" value="${a.bew}" ${ro}></label>
       <label class="field">Long. arm (in)<input data-f="arm" id="fl_arm_${i}" type="number" inputmode="decimal" step="0.01" value="${val(a.arm)}" ${ro}></label>
       <label class="field">Lat. arm (in, +R)<input data-f="lat" id="fl_lat_${i}" type="number" inputmode="decimal" step="0.01" value="${val(a.lat)}" ${ro}></label>
+      <label class="field">W&amp;B record date<input data-f="wbDate" id="fl_date_${i}" type="date" value="${esc(a.wbDate || "")}" ${ro}></label>
       ${a.builtin ? `<span class="hint del">Built in · updates with the app</span>` : `<button class="btn small danger del" type="button">Delete</button>`}`;
     if (a.builtin) return d;
     d.querySelectorAll("[data-f]").forEach(inp => inp.addEventListener("change", () => {
-      const f = inp.dataset.f, v = f === "tail" ? inp.value.trim().toUpperCase() || a.tail : f === "model" ? inp.value : num(inp.value);
+      const f = inp.dataset.f, v = f === "tail" ? inp.value.trim().toUpperCase() || a.tail : f === "model" || f === "wbDate" ? inp.value : num(inp.value);
       if (f === "model" && v !== a.model) delete S.loads[a.id];
       a[f] = v; saveState(); renderAll(); $("fleetMsg").textContent = `Saved ${a.tail}.`;
     }));
@@ -864,8 +1037,8 @@ function renderFleet() {
 const NEW_AC = { R22: ["N22NEW", 880, 103.5], R44: ["N44NEW", 1450, 105.5], R44II: ["N44IINEW", 1510, 106.5], R66: ["N66NEW", 1290, 109.0], R44C: ["N44CNEW", 1460, 106.2] };
 function addAc(mdl) {
   const id = "AC" + Date.now().toString(36), [tail, bew, arm] = NEW_AC[mdl];
-  S.custom.push({ id, tail, model: mdl, bew, arm, lat: 0 });
-  S.tailId = id; rebuildFleet(); saveState(); renderAll(); $("fleetBox").open = true; $("fleetMsg").textContent = "Added. Replace the tail number, empty weight and arms with this aircraft's W&B record.";
+  S.custom.push({ id, tail, model: mdl, bew, arm, lat: 0, wbDate: "" });
+  S.tailId = id; rebuildFleet(); saveState(); renderAll(); $("fleetBox").open = true; $("fleetMsg").textContent = "Added. Replace the tail number, empty weight, arms and record date with this aircraft's W&B record.";
 }
 $("addR22").onclick = () => addAc("R22");
 $("addR44").onclick = () => addAc("R44");
@@ -902,7 +1075,8 @@ function summaryText() {
   const a = ac(), m = model();
   const L = [`${a.tail} (${m.name}) WEIGHT & BALANCE`, `${new Date($("when").value || Date.now()).toLocaleString()}  PIC: ${S.pilot || "-"}`, `RESULT: ${R.ok ? "WITHIN LIMITS" : "OUT OF LIMITS"}`, ""];
   R.rows.concat(R.fuelRows).forEach(r => L.push(`${r.label.padEnd(30)} ${fmt(r.w).padStart(7)} lb  @ ${fmt(r.arm, 2)} / ${fmt(r.lat, 2)}`));
-  L.push("", `Zero fuel: ${fmt(R.zf.w)} lb, CG ${fmt(R.zf.cg, 2)} in, lat ${latStr(R.zf.lcg)}`, `Takeoff:   ${fmt(R.to.w)} lb, CG ${fmt(R.to.cg, 2)} in, lat ${latStr(R.to.lcg)}`, "");
+  L.push("", `Zero fuel: ${fmt(R.zf.w)} lb, CG ${fmt(R.zf.cg, 2)} in, lat ${latStr(R.zf.lcg)}`, `Takeoff:   ${fmt(R.to.w)} lb, CG ${fmt(R.to.cg, 2)} in, lat ${latStr(R.to.lcg)}`,
+    `Landing:   ${fmt(R.ld.w)} lb, CG ${fmt(R.ld.cg, 2)} in, lat ${latStr(R.ld.lcg)} (${RESERVE_MIN} min fuel)`, "");
   R.checks.forEach(c => L.push(`${c.ok ? "[OK] " : "[!!] "}${c.text}`));
   if ($("notes").value.trim()) L.push("", "Notes: " + $("notes").value.trim());
   return L.join("\n");
@@ -943,6 +1117,7 @@ function buildPdf() {
   };
   R.rows.forEach(r => line(r)); line({ label: "Zero usable fuel weight & CG", w: R.zf.w, arm: R.zf.cg, lat: R.zf.lcg, lm: R.zf.lm, tm: R.zf.tm }, true);
   R.fuelRows.forEach(r => line(r)); line({ label: "Takeoff gross weight & CG", w: R.to.w, arm: R.to.cg, lat: R.to.lcg, lm: R.to.lm, tm: R.to.tm }, true);
+  line({ label: `Landing, ${RESERVE_MIN} min fuel (${fmt(R.landG)} gal)`, w: R.ld.w, arm: R.ld.cg, lat: R.ld.lcg, lm: R.ld.lm, tm: R.ld.tm }, true);
   y += 10;
   // passenger manifest
   const mrows = manifestRows().filter(r => r.pic || r.name.trim() || r.person);
@@ -963,7 +1138,7 @@ function buildPdf() {
   doc.addImage(chartImage(chartOpts(m, R, "long"), 400, 320), "JPEG", M, y, cw, chL);
   doc.addImage(chartImage(chartOpts(m, R, "lat"), 400, 320), "JPEG", M + cw + 12, y, cw, chL);
   doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(90);
-  doc.text("Longitudinal CG envelope  (filled = takeoff, hollow = zero fuel)", M, y + chL + 10);
+  doc.text(`Longitudinal CG  (TO = takeoff, LDG = landing ${RESERVE_MIN} min fuel, ZF = zero fuel)`, M, y + chL + 10);
   doc.text("Lateral CG envelope  (+ = right side)", M + cw + 12, y + chL + 10);
   y += chL + 26;
   // checks
@@ -979,7 +1154,7 @@ function buildPdf() {
   // signature + disclaimer pinned to bottom of the last page
   const by = H - M - 30;
   doc.setDrawColor(120); doc.line(M, by, M + 240, by); doc.setFontSize(8); doc.setTextColor(90); doc.text("PIC signature", M, by + 10);
-  doc.text(`Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&B record). Limits per Robinson ${m.name} POH.`, M, by + 24);
+  doc.text(`Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&B record${a.wbDate ? " dated " + fmtDate(a.wbDate) : ""}). Limits per Robinson ${m.name} POH.`, M, by + 24);
   doc.text("Verify before flight: check these results against the aircraft's POH and current W&B record. The PIC is responsible for safe loading.", M, by + 34);
   doc.setFont("helvetica", "bold"); doc.text("Aeronautical Solutions and Strategies LLC", M, by + 46);
   return doc;
@@ -989,8 +1164,11 @@ const pdfName = () => `${ac().tail}_WB_${($("when").value || nowLocal()).replace
 // Send: phone share sheet when hosted (Mail, Messages, Print…); inside claude.ai the viewer's save/share prompt; otherwise a download.
 let downloads = null, inViewer = !!(window.claude && window.claude.use);
 if (inViewer) window.claude.use("downloads").then(d => { downloads = d; }, () => {});
+// messages show both in the Send panel and in the phone's bottom bar
+const msg = { set textContent(t) { $("actMsg").textContent = t; $("barMsg").textContent = t; } };
+const needPilot = () => { if (!R.incomplete) return false; msg.textContent = "Enter the pilot's weight first."; return true; };
 async function onSend() {
-  const msg = $("actMsg");
+  if (needPilot()) return;
   if (!window.jspdf) { msg.textContent = "The PDF tool didn't load. Connect once and reopen the app."; return; }
   const blob = buildPdf().output("blob"), name = pdfName();
   if (!inViewer) {
@@ -1012,6 +1190,7 @@ async function onSend() {
   setTimeout(() => URL.revokeObjectURL(url), 4000); msg.textContent = "PDF downloaded. Attach it to an email to send it.";
 }
 $("btnSend").onclick = onSend;
+$("barSend").onclick = onSend;
 
 // Print: fill #printReport (same content as the PDF) and print it; the print stylesheet hides the app.
 function buildPrintReport() {
@@ -1025,34 +1204,37 @@ function buildPrintReport() {
       <div class="pr-verdict ${R.ok ? "ok" : "bad"}">${R.ok ? "WITHIN LIMITS" : "OUT OF LIMITS"}</div>
     </header>
     <table><thead><tr><th>Item</th><th>Weight lb</th><th>Long. arm</th><th>Lat. arm</th><th>Long. mom</th><th>Lat. mom</th></tr></thead><tbody>
-      ${R.rows.map(r => row(r)).join("")}${tot("Zero usable fuel weight & CG", R.zf)}${R.fuelRows.map(r => row(r)).join("")}${tot("Takeoff gross weight & CG", R.to)}
+      ${R.rows.map(r => row(r)).join("")}${tot("Zero usable fuel weight & CG", R.zf)}${R.fuelRows.map(r => row(r)).join("")}${tot("Takeoff gross weight & CG", R.to)}${tot(`Landing, ${RESERVE_MIN} min fuel (${fmt(R.landG)} gal)`, R.ld)}
     </tbody></table>
     <h2>Passenger manifest</h2>
     <table class="mf-tbl"><thead><tr><th>Seat</th><th>Name</th><th>Occupant lb</th><th>Baggage lb</th><th>Emergency contact</th></tr></thead><tbody>
       ${mrows.map(r => `<tr><td>${r.label}${r.pic ? " (PIC)" : ""}</td><td>${esc(r.name.trim()) || "—"}</td><td>${r.person ? fmt(r.person, 0) : "—"}</td><td>${r.bag ? fmt(r.bag, 0) : "—"}</td><td>${esc(r.contact.trim())}</td></tr>`).join("")}
     </tbody></table>
     <div class="pr-charts">
-      <figure><img alt="Longitudinal CG envelope" src="${chartImage(chartOpts(m, R, "long"), 400, 320)}"><figcaption>Longitudinal CG envelope (filled = takeoff, hollow = zero fuel)</figcaption></figure>
+      <figure><img alt="Longitudinal CG envelope" src="${chartImage(chartOpts(m, R, "long"), 400, 320)}"><figcaption>Longitudinal CG (TO = takeoff, LDG = landing ${RESERVE_MIN} min fuel, ZF = zero fuel)</figcaption></figure>
       <figure><img alt="Lateral CG envelope" src="${chartImage(chartOpts(m, R, "lat"), 400, 320)}"><figcaption>Lateral CG envelope (+ = right side)</figcaption></figure>
     </div>
     <h2>Limit checks</h2>
     <ul class="pr-checks">${R.checks.map(c => `<li class="${c.ok ? "" : "bad"}"><b>${c.ok ? "OK" : "FAIL"}</b>${esc(c.text)}</li>`).join("")}</ul>
     ${notes ? `<h2>Notes</h2><p>${esc(notes)}</p>` : ""}
     <div class="pr-sign"><div class="line"></div>PIC signature</div>
-    <p class="pr-foot">Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&amp;B record). Limits per Robinson ${m.name} POH. Verify before flight: check these results against the aircraft's POH and current W&amp;B record. The PIC is responsible for safe loading.</p>
+    <p class="pr-foot">Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&amp;B record${a.wbDate ? " dated " + esc(fmtDate(a.wbDate)) : ""}). Limits per Robinson ${m.name} POH. Verify before flight: check these results against the aircraft's POH and current W&amp;B record. The PIC is responsible for safe loading.</p>
     <p class="pr-company">Aeronautical Solutions and Strategies LLC</p>`;
 }
 let reportReady = false;
-$("btnPrint").onclick = async () => {
+const onPrint = async () => {
+  if (needPilot()) return;
   buildPrintReport(); reportReady = true;
   await Promise.all([...$("printReport").querySelectorAll("img")].map(i => i.decode().catch(() => {})));
   window.print();
 };
+$("btnPrint").onclick = onPrint;
+$("barPrint").onclick = onPrint;
 // the browser's own Print menu gets the report too
 window.addEventListener("beforeprint", () => { if (!reportReady) buildPrintReport(); });
 window.addEventListener("afterprint", () => { reportReady = false; });
 // claude.ai's viewer can't open the print dialog; Send's share options cover printing there
-if (inViewer) $("btnPrint").hidden = true;
+if (inViewer) { $("btnPrint").hidden = true; $("barPrint").hidden = true; }
 
 renderAll();
 </script>
