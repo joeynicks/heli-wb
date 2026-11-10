@@ -172,17 +172,39 @@ tr.total td{font-weight:600;border-top:2px solid var(--ink);background:var(--fie
 details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);list-style-position:inside}
 .foot{color:var(--muted);font-size:.78rem;margin-top:18px;max-width:75ch}
 
+/* printing shows only the report built into #printReport, laid out like the PDF */
+#printReport{display:none}
 @media print{
-  :root:root:root{--bg:#fff;--panel:#fff;--ink:#000;--muted:#444;--line:#bbb;--field:#f3f3f3;--ok:#1d7a46;--ok-bg:#e3f3e9;--bad:#b42318;--bad-bg:#fdecea;color-scheme:light}
-  body::before,.tails,.actions,.no-print,details,.stepper button,.legend,.hint{display:none!important}
-  .wrap{padding-block:0;max-width:none}
-  .status{position:static;box-shadow:none;margin:6px 0 10px}
-  .panel{break-inside:avoid;padding:8px 10px;gap:6px}
-  .grid,.col{gap:8px}
-  .grid{grid-template-columns:1fr 1fr}
-  .stepper,.stepper input,.field input,.field textarea{border:0;background:none}
-  input[type=range],.toggle,#auxManual{display:none!important}
-  .foot{margin-top:8px}
+  :root:root:root{--bg:#fff;--panel:#fff;--ink:#000;--muted:#444;--line:#ccc;--field:#f2f4f6;color-scheme:light}
+  body{background:#fff;color:#000;font:10pt/1.35 Helvetica,Arial,sans-serif}
+  body::before{display:none!important}
+  .wrap{padding:0!important;max-width:none}
+  .wrap>*:not(#printReport){display:none!important}
+  #printReport{display:block!important}
+  #printReport h1{font:700 18pt Helvetica,Arial,sans-serif;margin:0}
+  #printReport h2{font:700 10.5pt Helvetica,Arial,sans-serif;color:#000;text-transform:none;letter-spacing:0;margin:12px 0 4px}
+  .pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px}
+  .pr-head p{margin:2px 0 0;color:#444;font-size:9pt}
+  .pr-verdict{border:1.5px solid;border-radius:4px;padding:8px 14px;font-weight:700;white-space:nowrap}
+  .pr-verdict.ok{color:#1d7a46;background:#e3f3e9}
+  .pr-verdict.bad{color:#b42318;background:#fdecea}
+  #printReport table{width:100%;border-collapse:collapse;font-size:8.5pt}
+  #printReport th,#printReport td{padding:2px 4px;border-bottom:1px solid #ccc;font-family:Helvetica,Arial,sans-serif}
+  #printReport th{color:#444;font-size:7.5pt}
+  #printReport tr.total td{font-weight:700;background:#f2f4f6;border-top:1px solid #000}
+  #printReport .mf-tbl th,#printReport .mf-tbl td{text-align:left}
+  #printReport .mf-tbl th:nth-child(3),#printReport .mf-tbl td:nth-child(3),#printReport .mf-tbl th:nth-child(4),#printReport .mf-tbl td:nth-child(4){text-align:right}
+  #printReport .mf-tbl th:nth-child(5),#printReport .mf-tbl td:nth-child(5){padding-left:16px}
+  .pr-charts{display:flex;gap:12px;margin-top:12px;break-inside:avoid}
+  .pr-charts figure{margin:0;flex:1 1 0;min-width:0}
+  .pr-charts img{width:100%;display:block}
+  .pr-charts figcaption{font-size:8pt;color:#444}
+  .pr-checks{list-style:none;padding:0;margin:0;font-size:9pt}
+  .pr-checks b{color:#1d7a46;display:inline-block;width:34px}
+  .pr-checks .bad b{color:#b42318}
+  .pr-sign{margin-top:28px;font-size:8pt;color:#444;break-inside:avoid}
+  .pr-sign .line{border-top:1px solid #555;width:240px;margin-bottom:3px}
+  .pr-foot{font-size:8pt;color:#444;margin:6px 0 0}
 }
 @page{margin:12mm}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -271,7 +293,8 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
       <section class="panel">
         <h2>Send</h2>
         <div class="actions" id="actions">
-          <button class="btn primary" id="btnSend" type="button" style="flex:1 1 100%">Send W&amp;B (PDF)</button>
+          <button class="btn primary" id="btnSend" type="button" style="flex:1 1 0">Send W&amp;B (PDF)</button>
+          <button class="btn" id="btnPrint" type="button" style="flex:1 1 0">Print</button>
         </div>
         <div class="msg" id="actMsg"></div>
       </section>
@@ -296,6 +319,8 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
       </div>
     </details>
   </section>
+
+  <div id="printReport" aria-hidden="true"></div>
 
   <p class="foot">Limits and arms are from the Robinson R22 and R44 Pilot's Operating Handbooks (Sections 2 and 6, rev. 2014–2015). Empty weight and CG come from each aircraft's own weight &amp; balance record. The pilot in command is responsible for verifying these results against the aircraft's POH.</p>
 </div>
@@ -526,12 +551,11 @@ function chartOpts(m, R, kind) {
     pts: [{ x: R.zf.cg, y: R.zf.lcg, ok: okLat(R.zf), hollow: true, label: "ZF" }, { x: R.to.cg, y: R.to.lcg, ok: okLat(R.to), label: "TO" }]
   };
 }
-let printing = false;
 function paintCanvas(cv, o) {
-  const dpr = Math.max(window.devicePixelRatio || 1, printing ? 2 : 1), W = cv.clientWidth || 500, H = cv.clientHeight || 400;
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 500, H = cv.clientHeight || 400;
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
   const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawChart(ctx, W, H, o, palette(printing));
+  drawChart(ctx, W, H, o, palette(false));
 }
 function chartImage(o, W, H) {
   const cv = document.createElement("canvas"), k = 2.5; cv.width = W * k; cv.height = H * k;
@@ -668,8 +692,6 @@ function update() {
 function renderAll() { renderTails(); renderStations(); renderRemovals(); renderFuel(); renderManifest(); renderFleet(); update(); }
 let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(update, 120); });
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", update);
-window.addEventListener("beforeprint", () => { printing = true; update(); });
-window.addEventListener("afterprint", () => { printing = false; update(); });
 new MutationObserver(update).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
 /* ---------- fleet editor ---------- */
@@ -834,6 +856,46 @@ async function onSend() {
   setTimeout(() => URL.revokeObjectURL(url), 4000); msg.textContent = "PDF downloaded. Attach it to an email to send it.";
 }
 $("btnSend").onclick = onSend;
+
+// Print: fill #printReport (same content as the PDF) and print it; the print stylesheet hides the app.
+function buildPrintReport() {
+  const a = ac(), m = model(), when = new Date($("when").value || Date.now()), notes = $("notes").value.trim();
+  const row = (r, cls = "") => `<tr class="${cls}"><td>${esc(r.label)}</td><td>${fmt(r.w)}</td><td>${fmt(r.arm, 2)}</td><td>${fmt(r.lat, 2)}</td><td>${fmt(r.lm, 0)}</td><td>${fmt(r.tm, 0)}</td></tr>`;
+  const tot = (label, t) => row({ label, w: t.w, arm: t.cg, lat: t.lcg, lm: t.lm, tm: t.tm }, "total");
+  const mrows = manifestRows().filter(r => r.pic || r.name.trim() || r.person);
+  $("printReport").innerHTML = `
+    <header class="pr-head">
+      <div><h1>${esc(a.tail)} Weight &amp; Balance</h1><p>Robinson ${m.name} · ${esc(when.toLocaleString())} · PIC: ${esc(S.pilot) || "________________"}</p></div>
+      <div class="pr-verdict ${R.ok ? "ok" : "bad"}">${R.ok ? "WITHIN LIMITS" : "OUT OF LIMITS"}</div>
+    </header>
+    <table><thead><tr><th>Item</th><th>Weight lb</th><th>Long. arm</th><th>Lat. arm</th><th>Long. mom</th><th>Lat. mom</th></tr></thead><tbody>
+      ${R.rows.map(r => row(r)).join("")}${tot("Zero usable fuel weight & CG", R.zf)}${R.fuelRows.map(r => row(r)).join("")}${tot("Takeoff gross weight & CG", R.to)}
+    </tbody></table>
+    <h2>Passenger manifest</h2>
+    <table class="mf-tbl"><thead><tr><th>Seat</th><th>Name</th><th>Occupant lb</th><th>Baggage lb</th><th>Emergency contact</th></tr></thead><tbody>
+      ${mrows.map(r => `<tr><td>${r.label}${r.pic ? " (PIC)" : ""}</td><td>${esc(r.name.trim()) || "—"}</td><td>${r.person ? fmt(r.person, 0) : "—"}</td><td>${r.bag ? fmt(r.bag, 0) : "—"}</td><td>${esc(r.contact.trim())}</td></tr>`).join("")}
+    </tbody></table>
+    <div class="pr-charts">
+      <figure><img alt="Longitudinal CG envelope" src="${chartImage(chartOpts(m, R, "long"), 400, 320)}"><figcaption>Longitudinal CG envelope (filled = takeoff, hollow = zero fuel)</figcaption></figure>
+      <figure><img alt="Lateral CG envelope" src="${chartImage(chartOpts(m, R, "lat"), 400, 320)}"><figcaption>Lateral CG envelope (+ = right side)</figcaption></figure>
+    </div>
+    <h2>Limit checks</h2>
+    <ul class="pr-checks">${R.checks.map(c => `<li class="${c.ok ? "" : "bad"}"><b>${c.ok ? "OK" : "FAIL"}</b>${esc(c.text)}</li>`).join("")}</ul>
+    ${notes ? `<h2>Notes</h2><p>${esc(notes)}</p>` : ""}
+    <div class="pr-sign"><div class="line"></div>PIC signature</div>
+    <p class="pr-foot">Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&amp;B record). Limits per Robinson ${a.model} POH. The pilot in command is responsible for verifying these results against the aircraft's POH.</p>`;
+}
+let reportReady = false;
+$("btnPrint").onclick = async () => {
+  buildPrintReport(); reportReady = true;
+  await Promise.all([...$("printReport").querySelectorAll("img")].map(i => i.decode().catch(() => {})));
+  window.print();
+};
+// the browser's own Print menu gets the report too
+window.addEventListener("beforeprint", () => { if (!reportReady) buildPrintReport(); });
+window.addEventListener("afterprint", () => { reportReady = false; });
+// claude.ai's viewer can't open the print dialog; Send's share options cover printing there
+if (inViewer) $("btnPrint").hidden = true;
 
 renderAll();
 </script>
