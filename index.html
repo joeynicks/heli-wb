@@ -14,11 +14,11 @@ if ("serviceWorker" in navigator) {
 }
 </script>
 </head>
-<body><title>Robinson Weight &amp; Balance</title>
+<body><title>AeroStrats Weight &amp; Balance</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="R22/R44 W&amp;B">
+<meta name="apple-mobile-web-app-title" content="AeroStrats W&amp;B">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -54,7 +54,14 @@ h2{font-size:1.15rem;text-transform:uppercase;letter-spacing:.06em;color:var(--m
 /* top bar */
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;justify-content:space-between}
 .top .sub{color:var(--muted);font-size:.85rem}
+.brand{font:700 1rem var(--display);letter-spacing:.06em;color:var(--accent);margin-bottom:2px}
+.site-foot{margin-top:18px;display:flex;flex-direction:column;gap:6px;max-width:75ch}
+.site-foot p{margin:0}
+.disclaimer{font-size:.8rem;color:var(--ink);border-left:3px solid var(--warn);padding:4px 0 4px 10px}
+.brand-foot{font:600 .85rem var(--display);letter-spacing:.04em;color:var(--muted)}
+.top-actions{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
 .tails{display:flex;gap:8px;flex-wrap:wrap}
+#newFlight[data-armed="1"]{border-color:var(--bad);color:var(--bad)}
 .tail{border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:7px 14px;font:600 1rem var(--display);letter-spacing:.04em;cursor:pointer}
 .tail small{font:500 .75rem var(--body);color:var(--muted);margin-left:6px;letter-spacing:0}
 .tail[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -185,6 +192,8 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
   #printReport h2{font:700 10.5pt Helvetica,Arial,sans-serif;color:#000;text-transform:none;letter-spacing:0;margin:12px 0 4px}
   .pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px}
   .pr-head p{margin:2px 0 0;color:#444;font-size:9pt}
+  .pr-brand{font:700 9pt Helvetica,Arial,sans-serif;color:#1f5f8b;letter-spacing:.04em;margin-bottom:2px}
+  .pr-company{font:700 8pt Helvetica,Arial,sans-serif;color:#444;margin:4px 0 0}
   .pr-verdict{border:1.5px solid;border-radius:4px;padding:8px 14px;font-weight:700;white-space:nowrap}
   .pr-verdict.ok{color:#1d7a46;background:#e3f3e9}
   .pr-verdict.bad{color:#b42318;background:#fdecea}
@@ -213,10 +222,14 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
 <div class="wrap">
   <header class="top">
     <div>
+      <div class="brand">AeroStratsLLC</div>
       <h1 id="title">Robinson Weight &amp; Balance</h1>
       <div class="sub" id="subtitle">Pick an aircraft, enter loads, check the envelope.</div>
     </div>
-    <div class="tails" id="tails" role="group" aria-label="Aircraft"></div>
+    <div class="top-actions">
+      <div class="tails" id="tails" role="group" aria-label="Aircraft"></div>
+      <button class="btn small" id="newFlight" type="button">New flight</button>
+    </div>
   </header>
 
   <div class="status" id="status" aria-live="polite">
@@ -237,13 +250,13 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
       </section>
 
       <section class="panel">
-        <div class="panel-h"><h2>Fuel</h2><span class="hint">6.0 lb/gal</span></div>
+        <div class="panel-h"><h2>Fuel</h2><span class="hint" id="fuelHint"></span></div>
         <div class="fuel">
           <div class="fuelline">
             <input type="range" id="mainRange" min="0" step="0.1" aria-label="Main fuel gallons">
             <div class="stepper"><button type="button" data-fuel="-1" aria-label="Less main fuel">−</button><input id="mainGal" type="number" inputmode="decimal" step="0.1" min="0" aria-label="Main fuel gallons"><button type="button" data-fuel="1" aria-label="More main fuel">+</button></div>
           </div>
-          <label class="toggle"><input type="checkbox" id="auxAuto" checked> Aux fuel follows main (interconnected tanks)</label>
+          <label class="toggle" id="auxToggle"><input type="checkbox" id="auxAuto" checked> Aux fuel follows main (interconnected tanks)</label>
           <div class="fuelline" id="auxManual" hidden>
             <span class="hint">Aux gallons</span>
             <div class="stepper"><button type="button" data-aux="-1" aria-label="Less aux fuel">−</button><input id="auxGal" type="number" inputmode="decimal" step="0.1" min="0" aria-label="Aux fuel gallons"><button type="button" data-aux="1" aria-label="More aux fuel">+</button></div>
@@ -292,6 +305,7 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
       </section>
       <section class="panel">
         <h2>Send</h2>
+        <p class="hint" style="margin:0">Verify these results against the POH and the aircraft's weight &amp; balance record before flight.</p>
         <div class="actions" id="actions">
           <button class="btn primary" id="btnSend" type="button" style="flex:1 1 0">Send W&amp;B (PDF)</button>
           <button class="btn" id="btnPrint" type="button" style="flex:1 1 0">Print</button>
@@ -305,15 +319,17 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
     <details id="fleetBox">
       <summary>Fleet &amp; empty weights</summary>
       <div class="fleet" style="margin-top:12px">
-        <p class="hint" style="margin:0">Enter values from each aircraft's current weight &amp; balance record. Changes are saved on this device only.</p>
+        <p class="hint" style="margin:0">N7187K and N931QA are built into the app and update when the app is updated. Aircraft you add here use values from their current weight &amp; balance record and are saved on this device only.</p>
         <div id="fleetList" class="fleet"></div>
         <div class="actions">
           <button class="btn small" id="addR22" type="button">Add R22</button>
           <button class="btn small" id="addR44" type="button">Add R44</button>
+          <button class="btn small" id="addR44C" type="button">Add R44 Cadet</button>
           <button class="btn small" id="addR44II" type="button">Add R44 II</button>
+          <button class="btn small" id="addR66" type="button">Add R66</button>
           <button class="btn small" id="exportFleet" type="button">Copy fleet code</button>
           <button class="btn small" id="importFleet" type="button">Load fleet code</button>
-          <button class="btn small danger" id="resetFleet" type="button">Reset to defaults</button>
+          <button class="btn small danger" id="resetFleet" type="button">Remove added aircraft</button>
         </div>
         <div id="importBox" hidden class="field">Paste fleet code<textarea id="importText"></textarea><div class="actions"><button class="btn small primary" id="importGo" type="button">Load</button><button class="btn small" id="importCancel" type="button">Cancel</button></div></div>
         <div class="msg" id="fleetMsg"></div>
@@ -323,7 +339,11 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
 
   <div id="printReport" aria-hidden="true"></div>
 
-  <p class="foot">Limits and arms are from the Robinson R22, R44 and R44 II Pilot's Operating Handbooks (Sections 2 and 6, rev. 2014–2024). The EXAMPLE R44 II uses the POH sample empty weight, not a real aircraft. Empty weight and CG come from each aircraft's own weight &amp; balance record. The pilot in command is responsible for verifying these results against the aircraft's POH.</p>
+  <footer class="site-foot">
+    <p class="disclaimer"><b>Verify before flight.</b> This tool is a planning aid. Check every result against the aircraft's POH and current weight &amp; balance record. The pilot in command is responsible for safe loading.</p>
+    <p class="foot" style="margin:0">Limits and arms are from the Robinson R22, R44, R44 Cadet, R44 II and R66 Pilot's Operating Handbooks (Sections 2 and 6, rev. 2014–2024). Empty weight and CG come from each aircraft's own weight &amp; balance record.</p>
+    <p class="brand-foot">© 2026 Aeronautical Solutions and Strategies LLC</p>
+  </footer>
 </div>
 
 <script>
@@ -331,7 +351,7 @@ details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:up
 /* ---------- aircraft models (POH data) ---------- */
 const MODELS = {
   R22: {
-    name: "R22 Beta II", maxGross: 1370, minGross: 920, seatMax: 240, bagMax: 50, fuelLb: 6,
+    name: "R22 Beta II", maxGross: 1370, minGross: 920, seatMax: 240, bagMax: 50, fuelLb: 6, fuelName: "Avgas",
     main: { usable: 16.9, arm: 108.6, lat: -11.0 },
     aux:  { usable: 9.4,  arm: 103.8, lat: 11.2 },
     // aux gallons vs main gallons, from the N7187K worksheet table
@@ -355,7 +375,7 @@ const MODELS = {
     axes: { x: [95,103,1], y: [900,1400,100], lat: [-3,3,1] }
   },
   R44: {
-    name: "R44 Raven I", maxGross: 2400, minGross: 1550, seatMax: 300, bagMax: 50, fuelLb: 6,
+    name: "R44 Raven I", maxGross: 2400, minGross: 1550, seatMax: 300, bagMax: 50, fuelLb: 6, fuelName: "Avgas",
     main: { usable: 29.5, arm: 106.0, lat: -13.5 },
     aux:  { usable: 17.0, arm: 102.0, lat: 13.0 },
     // aux gallons vs main gallons, from the N931QA worksheet table
@@ -402,16 +422,68 @@ MODELS.R44II = {
   envLong: [[92.0,1600],[92.0,2300],[93.0,2500],[98.0,2500],[102.5,2100],[102.5,1600]],
   axes: { x: [91,103,1], y: [1500,2600,100], lat: [-3,3,1] }
 };
+// R66 (POH Sections 2 & 6, rev. 2022): five seats, a 300 lb baggage compartment, one Jet A tank (no aux).
+MODELS.R66 = {
+  name: "R66", maxGross: 2700, minGross: 1400, seatMax: 300, bagMax: 50, fuelLb: 6.7, fuelName: "Jet A",
+  main: { usable: 73.6, arm: 102.5, lat: -3.0 },
+  aux: null,
+  stations: [
+    { key: "pilot", label: "Pilot (front right)", arm: 49.0, lat: 12.2, seat: "FR", def: 170 },
+    { key: "bagFR", label: "Baggage under front right", arm: 42.0, lat: 12.2, seat: "FR", bag: true },
+    { key: "fl",    label: "Passenger front left", arm: 49.0, lat: -12.2, seat: "FL" },
+    { key: "bagFL", label: "Baggage under front left", arm: 42.0, lat: -12.2, seat: "FL", bag: true },
+    { key: "ar",    label: "Passenger aft right", arm: 80.0, lat: 16.0, seat: "AR" },
+    { key: "bagAR", label: "Baggage under aft right", arm: 82.0, lat: 15.0, seat: "AR", bag: true },
+    { key: "ac",    label: "Passenger aft center", arm: 78.0, lat: 0.0, seat: "AC" },
+    { key: "al",    label: "Passenger aft left", arm: 80.0, lat: -16.0, seat: "AL" },
+    { key: "bagAL", label: "Baggage under aft left", arm: 82.0, lat: -15.0, seat: "AL", bag: true },
+    { key: "bagMain", label: "Baggage compartment", arm: 107.0, lat: 0.0, bag: true, max: 300 },
+    { key: "accR",  label: "Accessory mount bar (right)", arm: 23.0, lat: 14.0 },
+    { key: "accL",  label: "Accessory mount bar (left)", arm: 23.0, lat: -14.0 }
+  ],
+  seats: { FR: "Front right seat", FL: "Front left seat", AR: "Aft right seat", AC: "Aft center seat", AL: "Aft left seat" },
+  removals: [
+    { key: "dFR", label: "Front right door", w: 7.5, arm: 49.5, lat: 26.8 },
+    { key: "dFL", label: "Front left door", w: 7.5, arm: 49.5, lat: -26.8 },
+    { key: "dAR", label: "Aft right door", w: 7.0, arm: 75.2, lat: 27.2 },
+    { key: "dAL", label: "Aft left door", w: 7.0, arm: 75.2, lat: -27.2 },
+    { key: "ctl", label: "Left seat controls", w: 2.0, arm: 31.0, lat: -13.0 }
+  ],
+  envLong: [[91.0,1400],[91.0,2500],[92.0,2700],[98.0,2700],[102.5,2300],[102.5,1400]],
+  envLat:  [[91.0,-3.5],[91.0,3.5],[100.0,3.5],[102.5,2.5],[102.5,-2.5],[100.0,-3.5]],
+  axes: { x: [90,103,1], y: [1400,2800,100], lat: [-4,4,1] }
+};
+// R44 Cadet (POH rev. 26 Jan 2024): two seats; aft baggage compartments and the deck above them
+// (50 lb each, per side) in place of rear seats. Envelope is the R44's cut off at 2200 lb.
+MODELS.R44C = {
+  ...MODELS.R44II,
+  name: "R44 Cadet", maxGross: 2200, minGross: 1550,
+  bagNote: "50 lb per compartment and per side of aft deck",
+  stations: [
+    { key: "pilot", label: "Pilot (right seat)", arm: 49.5, lat: 12.2, seat: "R", def: 175 },
+    { key: "bagR",  label: "Baggage under right seat", arm: 44.0, lat: 11.5, seat: "R", bag: true },
+    { key: "pax",   label: "Passenger (left seat)", arm: 49.5, lat: -10.4, seat: "L" },
+    { key: "bagL",  label: "Baggage under left seat", arm: 44.0, lat: -11.5, seat: "L", bag: true },
+    { key: "aftCR", label: "Aft right baggage compartment", arm: 78.0, lat: 12.2, bag: true },
+    { key: "aftDR", label: "Aft right deck", arm: 78.0, lat: 12.2, bag: true },
+    { key: "aftCL", label: "Aft left baggage compartment", arm: 78.0, lat: -12.2, bag: true },
+    { key: "aftDL", label: "Aft left deck", arm: 78.0, lat: -12.2, bag: true },
+    { key: "accR",  label: "Accessory mount bar (right)", arm: 25.0, lat: 14.0 },
+    { key: "accL",  label: "Accessory mount bar (left)", arm: 25.0, lat: -14.0 }
+  ],
+  seats: { R: "Right seat", L: "Left seat" },
+  envLong: [[92.0,1550],[92.0,2000],[93.0,2200],[100.25,2200],[102.5,2000],[102.5,1550]],
+  axes: { x: [91,103,1], y: [1500,2300,100], lat: [-3,3,1] }
+};
 
-/* Default fleet: empty-weight moments as recorded in the worksheets.
-   EXAMPLE is the R44 II POH sample loading (Section 6, p. 6-6), not a real aircraft. */
-const DEFAULT_FLEET = [
+/* Built-in fleet: always taken from this file, so a reweigh published here reaches every phone.
+   Empty-weight moments as recorded in the worksheets. */
+const BUILTIN_FLEET = [
   { id: "N7187K", tail: "N7187K", model: "R22", bew: 895.2,  arm: 92706 / 895.2,   lat: -354 / 895.2 },
-  { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2 },
-  { id: "R44II-EX", tail: "EXAMPLE", model: "R44II", bew: 1510, arm: 106.5, lat: 0.2,
-    sample: { st: { pilot: 170, fl: 170, ar: 170, al: 170, bagFR: 10, bagFL: 10, bagAL: 10, accR: 5 }, rm: { dFR: true } } }
+  { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2 }
 ];
-const FLEET_VERSION = 2;
+const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
+const RETIRED_IDS = ["R44II-EX"]; // the old R44 II POH example
 // R22s before R44s, then by tail number
 const fleetOrder = (a, b) => a.model.localeCompare(b.model) || a.tail.localeCompare(b.tail);
 
@@ -422,17 +494,20 @@ const store = {
 };
 
 const S = {
-  fleet: store.get("fleet", null) || DEFAULT_FLEET.map(a => ({ ...a })),
+  custom: store.get("custom", null), // aircraft added on this phone
+  fleet: [],                          // built-in + custom, rebuilt by rebuildFleet()
   tailId: store.get("tail", null),
   loads: store.get("loads", {}),
   pilot: store.get("pilot", "")
 };
-// phones that saved a fleet before the R44 II existed get the example added once
-if (store.get("fleetVer", 1) < FLEET_VERSION) {
-  DEFAULT_FLEET.filter(d => d.id === "R44II-EX" && !S.fleet.find(a => a.id === d.id)).forEach(d => S.fleet.push({ ...d }));
-  store.set("fleetVer", FLEET_VERSION); store.set("fleet", S.fleet);
+// phones from before this change kept the whole fleet under "fleet": keep only what the pilot added
+if (!S.custom) S.custom = (store.get("fleet", []) || []).filter(a => !isBuiltin(a.id) && !RETIRED_IDS.includes(a.id));
+RETIRED_IDS.forEach(id => delete S.loads[id]);
+function rebuildFleet() {
+  S.fleet = BUILTIN_FLEET.map(a => ({ ...a, builtin: true })).concat(S.custom);
+  if (!S.fleet.find(a => a.id === S.tailId)) S.tailId = S.fleet.slice().sort(fleetOrder)[0].id;
 }
-if (!S.fleet.find(a => a.id === S.tailId)) S.tailId = S.fleet.slice().sort(fleetOrder)[0].id;
+rebuildFleet();
 
 const $ = id => document.getElementById(id);
 const fmt = (n, d = 1) => (Number.isFinite(n) ? n.toFixed(d) : "–");
@@ -440,14 +515,13 @@ const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; }
 const ac = () => S.fleet.find(a => a.id === S.tailId);
 const model = () => MODELS[ac().model];
 
-function freshLoad(m, a) {
+function freshLoad(m) {
   const st = {}; m.stations.forEach(s => st[s.key] = s.def || 0);
-  const smp = (a && a.sample) || {};
-  return { st: { ...st, ...smp.st }, rm: { ...smp.rm }, main: m.main.usable, auxAuto: true, aux: m.aux.usable, mf: {} };
+  return { st, rm: {}, main: m.main.usable, auxAuto: true, aux: m.aux ? m.aux.usable : 0, mf: {} };
 }
 function load() {
   const a = ac(), m = model();
-  if (!S.loads[a.id]) S.loads[a.id] = freshLoad(m, a);
+  if (!S.loads[a.id]) S.loads[a.id] = freshLoad(m);
   if (!S.loads[a.id].mf) S.loads[a.id].mf = {};
   return S.loads[a.id];
 }
@@ -462,7 +536,7 @@ function manifestRows() {
     return { seat: k, label: m.seats[k], pic: k === ps, name: k === ps ? S.pilot : (e.name || ""), contact: e.contact || "", person, bag };
   });
 }
-function saveState() { store.set("fleet", S.fleet); store.set("tail", S.tailId); store.set("loads", S.loads); store.set("pilot", S.pilot); }
+function saveState() { store.set("custom", S.custom); store.set("tail", S.tailId); store.set("loads", S.loads); store.set("pilot", S.pilot); }
 
 /* ---------- math ---------- */
 function auxFromMain(m, g) {
@@ -473,7 +547,7 @@ function auxFromMain(m, g) {
   }
   return m.aux.usable;
 }
-function auxGal(m, L) { return L.auxAuto ? auxFromMain(m, L.main) : Math.min(Math.max(L.aux, 0), m.aux.usable); }
+function auxGal(m, L) { if (!m.aux) return 0; return L.auxAuto ? auxFromMain(m, L.main) : Math.min(Math.max(L.aux, 0), m.aux.usable); }
 
 // [lo, hi] of the polygon along the line axis=v (axis 1: horizontal at y=v → x range; axis 0: vertical at x=v → y range)
 function rangeAt(poly, v, axis) {
@@ -499,7 +573,8 @@ function compute() {
   const mainG = Math.min(Math.max(L.main, 0), m.main.usable), auxG = auxGal(m, L);
   const fuelRows = [];
   const fadd = (label, g, t) => { const w = g * m.fuelLb; fuelRows.push({ label: `${label} (${fmt(g)} gal)`, w, arm: t.arm, lat: t.lat, lm: w * t.arm, tm: w * t.lat, kind: "fuel" }); };
-  fadd("Main fuel", mainG, m.main); fadd("Aux fuel", auxG, m.aux);
+  if (m.aux) { fadd("Main fuel", mainG, m.main); fadd("Aux fuel", auxG, m.aux); }
+  else fadd(`Fuel, ${m.fuelName}`, mainG, m.main);
   const to = sum(rows.concat(fuelRows));
 
   const checks = [];
@@ -519,7 +594,7 @@ function compute() {
     const w = m.stations.filter(s => s.seat === k).reduce((t, s) => t + num(L.st[s.key]), 0);
     if (w > m.seatMax) chk(false, `${m.seats[k]} ${fmt(w, 0)} lb incl. baggage, max ${m.seatMax} lb`);
   });
-  m.stations.filter(s => s.bag).forEach(s => { const w = num(L.st[s.key]); if (w > m.bagMax) chk(false, `${s.label} ${fmt(w, 0)} lb, max ${m.bagMax} lb`); });
+  m.stations.filter(s => s.bag).forEach(s => { const w = num(L.st[s.key]), mx = s.max || m.bagMax; if (w > mx) chk(false, `${s.label} ${fmt(w, 0)} lb, max ${mx} lb`); });
   if (num(L.st.pilot) <= 0) chk(false, "Enter a pilot weight");
   return { rows, fuelRows, zf, to, checks, ok: checks.every(c => c.ok), mainG, auxG };
 }
@@ -596,7 +671,7 @@ function chartImage(o, W, H) {
 function renderTails() {
   $("tails").replaceChildren(...S.fleet.slice().sort(fleetOrder).map(a => {
     const b = document.createElement("button"); b.type = "button"; b.className = "tail";
-    b.setAttribute("aria-pressed", a.id === S.tailId); b.innerHTML = `${esc(a.tail)}<small>${a.model}</small>`;
+    b.setAttribute("aria-pressed", a.id === S.tailId); b.innerHTML = `${esc(a.tail)}<small>${({ R44II: "R44 II", R44C: "R44 Cadet" })[a.model] || a.model}</small>`;
     b.onclick = () => { S.tailId = a.id; saveState(); renderAll(); };
     return b;
   }));
@@ -615,7 +690,8 @@ function stepper(id, value, onChange, step) {
 }
 function renderStations() {
   const m = model(), L = load(), box = $("stations"); box.replaceChildren();
-  $("seatHint").textContent = `Max ${m.seatMax} lb per seat incl. baggage · ${m.bagMax} lb per compartment`;
+  const mainBag = m.stations.find(s => s.bag && s.max);
+  $("seatHint").textContent = `Max ${m.seatMax} lb per seat incl. baggage · ${m.bagNote || `${m.bagMax} lb per under-seat compartment`}` + (mainBag ? ` · ${mainBag.max} lb in the baggage compartment` : "");
   Object.keys(m.seats).forEach(k => {
     const g = document.createElement("div"); g.className = "seatgroup rows";
     m.stations.filter(s => s.seat === k).forEach(s => {
@@ -677,10 +753,29 @@ function updateManifestWeights() {
 }
 $("mfClear").onclick = () => { load().mf = {}; renderManifest(); update(); };
 
+// New flight: every aircraft back to default loading (pilot 170/175, full fuel, nothing removed, no passengers);
+// the PIC name stays on this phone.
+let nfTimer;
+$("newFlight").onclick = e => {
+  const b = e.currentTarget; clearTimeout(nfTimer);
+  if (b.dataset.armed !== "1") {
+    b.dataset.armed = "1"; b.textContent = "Tap again to clear";
+    nfTimer = setTimeout(() => { b.dataset.armed = ""; b.textContent = "New flight"; }, 4000);
+    return;
+  }
+  S.loads = {}; $("notes").value = ""; $("when").value = nowLocal(); $("actMsg").textContent = "";
+  renderAll();
+  b.dataset.armed = ""; b.textContent = "Cleared";
+  nfTimer = setTimeout(() => { b.textContent = "New flight"; }, 2000);
+};
+
 function renderFuel() {
   const m = model(), L = load();
   $("mainRange").max = m.main.usable; $("mainRange").value = L.main;
   $("mainGal").max = m.main.usable; $("mainGal").value = L.main;
+  $("fuelHint").textContent = `${m.fuelName} · ${m.fuelLb} lb/gal`;
+  $("auxToggle").hidden = !m.aux;
+  if (!m.aux) { $("auxManual").hidden = true; return; }
   $("auxGal").max = m.aux.usable; $("auxGal").value = auxGal(m, L);
   $("auxAuto").checked = L.auxAuto; $("auxManual").hidden = L.auxAuto;
 }
@@ -715,8 +810,10 @@ function update() {
   $("roCG").textContent = fmt(R.to.cg, 2) + " in";
   $("roLat").textContent = latStr(R.to.lcg);
   const mg = m.maxGross - R.to.w; $("roMargin").textContent = (mg >= 0 ? "" : "−") + fmt(Math.abs(mg)) + " lb"; $("roMargin").style.color = mg < 0 ? "var(--bad)" : "";
-  $("fuelGauge").innerHTML = `<span>Main <span class="num">${fmt(R.mainG)}/${m.main.usable} gal · ${fmt(R.mainG * m.fuelLb)} lb</span></span><span>Aux <span class="num">${fmt(R.auxG)}/${m.aux.usable} gal · ${fmt(R.auxG * m.fuelLb)} lb</span></span><span>Total <span class="num">${fmt((R.mainG + R.auxG) * m.fuelLb)} lb</span></span>`;
-  if (load().auxAuto && document.activeElement !== $("auxGal")) $("auxGal").value = R.auxG;
+  $("fuelGauge").innerHTML = m.aux
+    ? `<span>Main <span class="num">${fmt(R.mainG)}/${m.main.usable} gal · ${fmt(R.mainG * m.fuelLb)} lb</span></span><span>Aux <span class="num">${fmt(R.auxG)}/${m.aux.usable} gal · ${fmt(R.auxG * m.fuelLb)} lb</span></span><span>Total <span class="num">${fmt((R.mainG + R.auxG) * m.fuelLb)} lb</span></span>`
+    : `<span>Fuel <span class="num">${fmt(R.mainG)}/${m.main.usable} gal · ${fmt(R.mainG * m.fuelLb)} lb</span></span>`;
+  if (m.aux && load().auxAuto && document.activeElement !== $("auxGal")) $("auxGal").value = R.auxG;
   document.querySelectorAll(".seatwarn").forEach(el => {
     const w = m.stations.filter(s => s.seat === el.dataset.seat).reduce((t, s) => t + num(load().st[s.key]), 0);
     el.textContent = w > m.seatMax ? `${fmt(w, 0)} lb on this seat; max ${m.seatMax} lb incl. baggage` : "";
@@ -738,52 +835,65 @@ new MutationObserver(update).observe(document.documentElement, { attributes: tru
 /* ---------- fleet editor ---------- */
 function renderFleet() {
   $("fleetList").replaceChildren(...S.fleet.map((a, i) => {
-    const d = document.createElement("div"); d.className = "ac";
+    const d = document.createElement("div"), ro = a.builtin ? "disabled" : ""; d.className = "ac";
+    // built-in aircraft show (2 decimals) but can't be edited here; added aircraft keep full precision
+    const val = v => (a.builtin ? fmt(v, 2) : v);
     d.innerHTML = `
-      <label class="field">Tail number<input data-f="tail" id="fl_tail_${i}" value="${esc(a.tail)}"></label>
-      <label class="field">Model<select data-f="model" id="fl_model_${i}">${Object.keys(MODELS).map(k => `<option value="${k}" ${a.model === k ? "selected" : ""}>${MODELS[k].name}</option>`).join("")}</select></label>
-      <label class="field">Empty wt (lb)<input data-f="bew" id="fl_bew_${i}" type="number" inputmode="decimal" step="0.1" value="${a.bew}"></label>
-      <label class="field">Long. arm (in)<input data-f="arm" id="fl_arm_${i}" type="number" inputmode="decimal" step="0.01" value="${a.arm}"></label>
-      <label class="field">Lat. arm (in, +R)<input data-f="lat" id="fl_lat_${i}" type="number" inputmode="decimal" step="0.01" value="${a.lat}"></label>
-      <button class="btn small danger del" type="button">Delete</button>`;
+      <label class="field">Tail number<input data-f="tail" id="fl_tail_${i}" value="${esc(a.tail)}" ${ro}></label>
+      <label class="field">Model<select data-f="model" id="fl_model_${i}" ${ro}>${Object.keys(MODELS).map(k => `<option value="${k}" ${a.model === k ? "selected" : ""}>${MODELS[k].name}</option>`).join("")}</select></label>
+      <label class="field">Empty wt (lb)<input data-f="bew" id="fl_bew_${i}" type="number" inputmode="decimal" step="0.1" value="${a.bew}" ${ro}></label>
+      <label class="field">Long. arm (in)<input data-f="arm" id="fl_arm_${i}" type="number" inputmode="decimal" step="0.01" value="${val(a.arm)}" ${ro}></label>
+      <label class="field">Lat. arm (in, +R)<input data-f="lat" id="fl_lat_${i}" type="number" inputmode="decimal" step="0.01" value="${val(a.lat)}" ${ro}></label>
+      ${a.builtin ? `<span class="hint del">Built in · updates with the app</span>` : `<button class="btn small danger del" type="button">Delete</button>`}`;
+    if (a.builtin) return d;
     d.querySelectorAll("[data-f]").forEach(inp => inp.addEventListener("change", () => {
-      const f = inp.dataset.f, val = f === "tail" ? inp.value.trim().toUpperCase() || a.tail : f === "model" ? inp.value : num(inp.value);
-      if (f === "model" && val !== a.model) delete S.loads[a.id];
-      a[f] = val; saveState(); renderAll(); $("fleetMsg").textContent = `Saved ${a.tail}.`;
+      const f = inp.dataset.f, v = f === "tail" ? inp.value.trim().toUpperCase() || a.tail : f === "model" ? inp.value : num(inp.value);
+      if (f === "model" && v !== a.model) delete S.loads[a.id];
+      a[f] = v; saveState(); renderAll(); $("fleetMsg").textContent = `Saved ${a.tail}.`;
     }));
     const del = d.querySelector(".del");
     del.onclick = () => {
-      if (S.fleet.length === 1) { $("fleetMsg").textContent = "Keep at least one aircraft."; return; }
       if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.textContent = "Tap again to delete"; return; }
-      S.fleet.splice(i, 1); delete S.loads[a.id]; if (S.tailId === a.id) S.tailId = S.fleet[0].id; saveState(); renderAll(); $("fleetMsg").textContent = `Deleted ${a.tail}.`;
+      S.custom = S.custom.filter(c => c.id !== a.id); delete S.loads[a.id];
+      rebuildFleet(); saveState(); renderAll(); $("fleetMsg").textContent = `Deleted ${a.tail}.`;
     };
     return d;
   }));
 }
 // placeholder values for a new aircraft until its W&B record is entered
-const NEW_AC = { R22: ["N22NEW", 880, 103.5], R44: ["N44NEW", 1450, 105.5], R44II: ["N44IINEW", 1510, 106.5] };
+const NEW_AC = { R22: ["N22NEW", 880, 103.5], R44: ["N44NEW", 1450, 105.5], R44II: ["N44IINEW", 1510, 106.5], R66: ["N66NEW", 1290, 109.0], R44C: ["N44CNEW", 1460, 106.2] };
 function addAc(mdl) {
   const id = "AC" + Date.now().toString(36), [tail, bew, arm] = NEW_AC[mdl];
-  S.fleet.push({ id, tail, model: mdl, bew, arm, lat: 0 });
-  S.tailId = id; saveState(); renderAll(); $("fleetMsg").textContent = "Added. Replace the tail number, empty weight and arms with this aircraft's W&B record.";
+  S.custom.push({ id, tail, model: mdl, bew, arm, lat: 0 });
+  S.tailId = id; rebuildFleet(); saveState(); renderAll(); $("fleetBox").open = true; $("fleetMsg").textContent = "Added. Replace the tail number, empty weight and arms with this aircraft's W&B record.";
 }
 $("addR22").onclick = () => addAc("R22");
 $("addR44").onclick = () => addAc("R44");
 $("addR44II").onclick = () => addAc("R44II");
+$("addR66").onclick = () => addAc("R66");
+$("addR44C").onclick = () => addAc("R44C");
 $("resetFleet").onclick = e => {
   const b = e.currentTarget;
-  if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Tap again to reset"; return; }
-  b.dataset.armed = ""; b.textContent = "Reset to defaults";
-  S.fleet = DEFAULT_FLEET.map(a => ({ ...a })); S.loads = {}; S.tailId = S.fleet[0].id; saveState(); renderAll(); $("fleetMsg").textContent = "Fleet reset to N7187K, N931QA and the R44 II example.";
+  if (!S.custom.length) { $("fleetMsg").textContent = "No added aircraft to remove."; return; }
+  if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Tap again to remove"; return; }
+  b.dataset.armed = ""; b.textContent = "Remove added aircraft";
+  S.custom.forEach(c => delete S.loads[c.id]); S.custom = [];
+  rebuildFleet(); saveState(); renderAll(); $("fleetMsg").textContent = "Added aircraft removed. N7187K and N931QA remain.";
 };
-$("exportFleet").onclick = () => copyText(btoa(JSON.stringify(S.fleet)), $("fleetMsg"), "Fleet code copied. Paste it into this app on another phone with Load fleet code.");
+$("exportFleet").onclick = () => {
+  if (!S.custom.length) { $("fleetMsg").textContent = "No added aircraft to copy. N7187K and N931QA are already on every phone."; return; }
+  copyText(btoa(JSON.stringify(S.custom)), $("fleetMsg"), "Fleet code copied. Paste it into this app on another phone with Load fleet code.");
+};
 $("importFleet").onclick = () => { $("importBox").hidden = false; $("importText").focus(); };
 $("importCancel").onclick = () => { $("importBox").hidden = true; };
 $("importGo").onclick = () => {
   try {
     const f = JSON.parse(atob($("importText").value.trim()));
-    if (!Array.isArray(f) || !f.length || !f.every(a => a.id && a.tail && MODELS[a.model] && Number.isFinite(a.bew) && Number.isFinite(a.arm) && Number.isFinite(a.lat))) throw 0;
-    S.fleet = f; S.loads = {}; S.tailId = f[0].id; saveState(); $("importBox").hidden = true; renderAll(); $("fleetMsg").textContent = `Loaded ${f.length} aircraft.`;
+    if (!Array.isArray(f) || !f.every(a => a.id && a.tail && MODELS[a.model] && Number.isFinite(a.bew) && Number.isFinite(a.arm) && Number.isFinite(a.lat))) throw 0;
+    // older codes may include the built-in aircraft or the retired example; those always come from the app
+    const added = f.filter(a => !isBuiltin(a.id) && !RETIRED_IDS.includes(a.id)).map(({ builtin, sample, ...a }) => a);
+    S.custom.forEach(c => delete S.loads[c.id]); S.custom = added;
+    rebuildFleet(); saveState(); $("importBox").hidden = true; renderAll(); $("fleetMsg").textContent = `Loaded ${added.length} added aircraft.`;
   } catch (e) { $("fleetMsg").textContent = "That code didn't load. Copy the whole fleet code and try again."; }
 };
 
@@ -810,7 +920,8 @@ function buildPdf() {
   const a = ac(), m = model(), W = 612, H = 792, M = 40, BOTTOM = H - M - 52; let y = M;
   const ensure = h => { if (y + h > BOTTOM) { doc.addPage(); y = M + 10; } };
   const when = new Date($("when").value || Date.now());
-  doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text(`${a.tail} Weight & Balance`, M, y + 6);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(31, 95, 139); doc.text("AeroStratsLLC", M, y - 12);
+  doc.setFontSize(18); doc.setTextColor(20); doc.text(`${a.tail} Weight & Balance`, M, y + 6);
   doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90);
   doc.text(`Robinson ${m.name}   ·   ${when.toLocaleString()}   ·   PIC: ${S.pilot || "________________"}`, M, y + 24);
   // verdict box
@@ -869,7 +980,8 @@ function buildPdf() {
   const by = H - M - 30;
   doc.setDrawColor(120); doc.line(M, by, M + 240, by); doc.setFontSize(8); doc.setTextColor(90); doc.text("PIC signature", M, by + 10);
   doc.text(`Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&B record). Limits per Robinson ${m.name} POH.`, M, by + 24);
-  doc.text("The pilot in command is responsible for verifying these results against the aircraft's POH.", M, by + 34);
+  doc.text("Verify before flight: check these results against the aircraft's POH and current W&B record. The PIC is responsible for safe loading.", M, by + 34);
+  doc.setFont("helvetica", "bold"); doc.text("Aeronautical Solutions and Strategies LLC", M, by + 46);
   return doc;
 }
 const pdfName = () => `${ac().tail}_WB_${($("when").value || nowLocal()).replace(/[:T]/g, "-")}.pdf`;
@@ -909,7 +1021,7 @@ function buildPrintReport() {
   const mrows = manifestRows().filter(r => r.pic || r.name.trim() || r.person);
   $("printReport").innerHTML = `
     <header class="pr-head">
-      <div><h1>${esc(a.tail)} Weight &amp; Balance</h1><p>Robinson ${m.name} · ${esc(when.toLocaleString())} · PIC: ${esc(S.pilot) || "________________"}</p></div>
+      <div><div class="pr-brand">AeroStratsLLC</div><h1>${esc(a.tail)} Weight &amp; Balance</h1><p>Robinson ${m.name} · ${esc(when.toLocaleString())} · PIC: ${esc(S.pilot) || "________________"}</p></div>
       <div class="pr-verdict ${R.ok ? "ok" : "bad"}">${R.ok ? "WITHIN LIMITS" : "OUT OF LIMITS"}</div>
     </header>
     <table><thead><tr><th>Item</th><th>Weight lb</th><th>Long. arm</th><th>Lat. arm</th><th>Long. mom</th><th>Lat. mom</th></tr></thead><tbody>
@@ -927,7 +1039,8 @@ function buildPrintReport() {
     <ul class="pr-checks">${R.checks.map(c => `<li class="${c.ok ? "" : "bad"}"><b>${c.ok ? "OK" : "FAIL"}</b>${esc(c.text)}</li>`).join("")}</ul>
     ${notes ? `<h2>Notes</h2><p>${esc(notes)}</p>` : ""}
     <div class="pr-sign"><div class="line"></div>PIC signature</div>
-    <p class="pr-foot">Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&amp;B record). Limits per Robinson ${m.name} POH. The pilot in command is responsible for verifying these results against the aircraft's POH.</p>`;
+    <p class="pr-foot">Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&amp;B record). Limits per Robinson ${m.name} POH. Verify before flight: check these results against the aircraft's POH and current W&amp;B record. The PIC is responsible for safe loading.</p>
+    <p class="pr-company">Aeronautical Solutions and Strategies LLC</p>`;
 }
 let reportReady = false;
 $("btnPrint").onclick = async () => {

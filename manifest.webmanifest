@@ -1,7 +1,7 @@
 {
-  "name": "Robinson Weight & Balance",
-  "short_name": "R22/R44 W&B",
-  "description": "Weight & balance for Robinson R22 Beta II and R44 Raven I with CG envelope charts.",
+  "name": "AeroStrats Weight & Balance",
+  "short_name": "AeroStrats W&B",
+  "description": "Weight & balance for Robinson R22, R44, R44 Cadet, R44 II and R66 with CG envelope charts, by Aeronautical Solutions and Strategies LLC.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
