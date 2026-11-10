@@ -645,7 +645,7 @@ const BUILTIN_FLEET = [
   { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "" }
 ];
 // APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
-const APP_BUILD = "20261110103229";
+const APP_BUILD = "20261110105536";
 const DATA_UPDATED = "2026-10-26";
 const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
@@ -1641,24 +1641,55 @@ const bindPerf = (id, key, kind) => { const el = $(id); if (kind === "check") el
   }); };
 const WX_KEYS = ["mode", "pa", "elev", "alt", "oat"];
 
-/* ---------- current weather: National Weather Service observations (US stations; the API allows browser requests) ---------- */
+/* ---------- current weather ---------- */
 const zTime = d => d.toISOString().slice(11, 16).replace(":", "") + "Z";
 function wxLine(w) {
   const age = Math.round((Date.now() - new Date(w.time)) / 60000);
   const ago = age < 60 ? `${age} min ago` : `${Math.floor(age / 60)} h ${age % 60} min ago`;
   const wind = w.wspd == null ? "" : w.wspd < 1 ? " · wind calm" : ` · wind ${w.wdir == null ? "VRB" : String(Math.round(w.wdir / 10) * 10).padStart(3, "0")}° ${Math.round(w.wspd)} kt${w.gust ? " G" + Math.round(w.gust) : ""}`;
   const altAt = w.altTime && w.altTime !== w.time ? ` (from ${zTime(new Date(w.altTime))})` : "";
+  // a real METAR is shown as reported; the backup feed only has decoded values
+  if (w.raw) return `${w.name ? w.name + " · " : ""}${ago} · ${w.raw}`;
   return `${w.id} ${w.name} · ${zTime(new Date(w.time))} (${ago}) · ${fmt(w.temp, 0)} °C · altimeter ${w.alt.toFixed(2)}${altAt}${wind}`;
 }
 function showWxMsg(text, bad) {
   const el = $("pWxMsg");
   if (text == null && PI.wx) {
-    text = wxLine(PI.wx) + ". Check the field elevation.";
+    text = wxLine(PI.wx) + (PI.wx.elevPublished ? "" : ". Check the field elevation.");
     const old = Date.now() - new Date(PI.wx.time) > 90 * 60000 || Date.now() - new Date(PI.wx.altTime || PI.wx.time) > 3 * 3600e3;
     bad = old; if (old) text = "Old report, check current conditions: " + text;
   }
   el.hidden = !text; el.textContent = text || ""; el.classList.toggle("bad", !!bad);
 }
+// Main source: aviationweather.gov METAR and airport record, through the app's own relay (that site does not allow
+// requests from web pages). Returns null when the airport has no METAR; throws when the relay can't be reached.
+const WX_RELAY = "https://wx-relay.jonathon-afd.workers.dev";
+async function fetchMetar(id) {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 10000);
+  const get = async kind => {
+    const r = await fetch(`${WX_RELAY}/${kind}?id=${encodeURIComponent(id)}`, { signal: ctl.signal });
+    if (r.status === 204) return null;
+    if (!r.ok) throw new Error("relay " + r.status);
+    const j = await r.json().catch(() => null);
+    return Array.isArray(j) && j.length ? j[0] : null;
+  };
+  try {
+    // the airport record only adds the published field elevation: its failure must not lose the METAR
+    const [m, ap] = await Promise.all([get("metar"), get("airport").catch(() => null)]);
+    if (!m) return null;
+    const raw = String(m.rawOb || "").replace(/^(METAR|SPECI)\s+/, "");
+    // altimeter and temperature as reported: A3016 / Q1013, and the T01940089 tenths group when present
+    const a = / A(\d{4})(?: |$)/.exec(raw), q = / Q(\d{4})(?: |$)/.exec(raw), tg = / T([01])(\d{3})[01]\d{3}(?: |$)/.exec(raw);
+    const alt = a ? +a[1] / 100 : q ? +q[1] / 33.86389 : Number.isFinite(+m.altim) && m.altim != null ? +m.altim / 33.86389 : null;
+    const temp = tg ? (tg[1] === "1" ? -1 : 1) * +tg[2] / 10 : (m.temp != null && Number.isFinite(+m.temp) ? +m.temp : null);
+    if (alt == null || temp == null || !m.obsTime) return { id, none: true };
+    const elevM = ap && Number.isFinite(+ap.elev) ? +ap.elev : (Number.isFinite(+m.elev) ? +m.elev : null);
+    return { id: m.icaoId || id, name: String(m.name || "").replace(/,\s*[A-Z]{2},\s*[A-Z]{2}$/, ""), raw, time: new Date(m.obsTime * 1000).toISOString(),
+      temp, alt, elevFt: elevM == null ? null : elevM * 3.28084, elevPublished: !!(ap && Number.isFinite(+ap.elev)),
+      wdir: Number.isFinite(+m.wdir) ? +m.wdir : null, wspd: Number.isFinite(+m.wspd) ? +m.wspd : null, gust: Number.isFinite(+m.wgst) ? +m.wgst : null };
+  } finally { clearTimeout(t); }
+}
+// Backup source: National Weather Service observations (US stations only; allows requests from web pages).
 async function fetchObs(id) {
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 12000);
   try {
@@ -1692,7 +1723,10 @@ async function getWeather(e) {
   try {
     // US airports are often typed without the K: try KSDL for SDL
     let w = null;
-    for (const id of raw.length === 3 && /^[A-Z]{3}$/.test(raw) ? ["K" + raw, raw] : [raw]) { w = await fetchObs(id); if (w) break; }
+    const ids = raw.length === 3 && /^[A-Z]{3}$/.test(raw) ? ["K" + raw, raw] : [raw];
+    // the METAR relay first; the weather-service feed if the relay is down or has nothing usable
+    try { for (const id of ids) { w = await fetchMetar(id); if (w) break; } } catch (err) { w = null; }
+    if (!w || w.none) { let b = null; for (const id of ids) { b = await fetchObs(id).catch(err => { if (w) return null; throw err; }); if (b) break; } if (b && !b.none) w = b; else if (!w) w = b; }
     if (!w) { showWxMsg(`No weather station found for ${raw}. Use the identifier of a nearby airport with ASOS/AWOS weather, or enter the conditions below.`, true); return; }
     if (w.none) { showWxMsg(`${w.id} has no recent temperature and altimeter report. Try a nearby airport, or enter the conditions below.`, true); return; }
     Object.assign(PI, { mode: "field", elev: w.elevFt == null ? PI.elev : String(Math.round(w.elevFt)), alt: w.alt.toFixed(2), oat: String(+w.temp.toFixed(1)), wx: w });
