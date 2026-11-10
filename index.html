@@ -244,13 +244,17 @@ details.panel>summary{list-style-position:inside}
 #printReport{display:none}
 @media print{
   :root:root:root{--bg:#fff;--panel:#fff;--ink:#000;--muted:#444;--line:#ccc;--field:#f2f4f6;color-scheme:light}
-  body{background:#fff;color:#000;font:10pt/1.35 Helvetica,Arial,sans-serif}
+  body{background:#fff;color:#000}
   body::before{display:none!important}
   .wrap{padding:0!important;max-width:none}
   .wrap>*:not(#printReport){display:none!important}
   #printReport{display:block!important}
-  #printReport h1{font:700 18pt Helvetica,Arial,sans-serif;margin:0}
-  #printReport h2{font:700 10.5pt Helvetica,Arial,sans-serif;color:#000;text-transform:none;letter-spacing:0;margin:12px 0 4px}
+}
+/* report styles apply on screen too, so the report can be measured off-screen and scaled to one page */
+#printReport{background:#fff;color:#000;font:9pt/1.3 Helvetica,Arial,sans-serif}
+#printReport p{margin:0}
+#printReport h1{font:700 17pt Helvetica,Arial,sans-serif;margin:0;color:#000}
+#printReport h2{font:700 9.5pt Helvetica,Arial,sans-serif;color:#000;text-transform:none;letter-spacing:0;margin:9px 0 3px}
   .pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px}
   .pr-head p{margin:2px 0 0;color:#444;font-size:9pt}
   .pr-brand{font:700 9pt Helvetica,Arial,sans-serif;color:#1f5f8b;letter-spacing:.04em;margin-bottom:2px}
@@ -265,17 +269,20 @@ details.panel>summary{list-style-position:inside}
   #printReport .mf-tbl th,#printReport .mf-tbl td{text-align:left}
   #printReport .mf-tbl th:nth-child(3),#printReport .mf-tbl td:nth-child(3),#printReport .mf-tbl th:nth-child(4),#printReport .mf-tbl td:nth-child(4){text-align:right}
   #printReport .mf-tbl th:nth-child(5),#printReport .mf-tbl td:nth-child(5){padding-left:16px}
-  .pr-charts{display:flex;gap:12px;margin-top:12px;break-inside:avoid}
-  .pr-charts figure{margin:0;flex:1 1 0;min-width:0}
-  .pr-charts img{width:100%;display:block}
-  .pr-charts figcaption{font-size:8pt;color:#444}
-  .pr-checks{list-style:none;padding:0;margin:0;font-size:9pt}
-  .pr-checks b{color:#1d7a46;display:inline-block;width:34px}
+  .pr-charts{display:flex;justify-content:center;gap:14px;margin-top:9px;break-inside:avoid}
+  .pr-charts figure{margin:0;flex:0 1 330px;min-width:0}
+  .pr-charts img{width:100%;aspect-ratio:5/4;display:block}
+  .pr-charts figcaption{font-size:7.5pt;color:#444}
+  .pr-two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .pr-checks{list-style:none;padding:0;margin:0;font-size:8.5pt}
+  .pr-checks li{display:flex;gap:6px}
+  .pr-checks b{color:#1d7a46;flex:0 0 30px}
   .pr-checks .bad b{color:#b42318}
-  .pr-sign{margin-top:28px;font-size:8pt;color:#444;break-inside:avoid}
+  .pr-perf p{font-size:8.5pt;margin:0 0 2px}
+  .pr-notes{font-size:8.5pt;white-space:pre-wrap}
+  .pr-sign{margin-top:22px;font-size:8pt;color:#444;break-inside:avoid}
   .pr-sign .line{border-top:1px solid #555;width:240px;margin-bottom:3px}
-  .pr-foot{font-size:8pt;color:#444;margin:6px 0 0}
-}
+  .pr-foot{font-size:7.5pt;color:#444;margin:5px 0 0}
 @page{margin:12mm}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -638,7 +645,7 @@ const BUILTIN_FLEET = [
   { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "" }
 ];
 // APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
-const APP_BUILD = "20261110005147";
+const APP_BUILD = "20261110010135";
 const DATA_UPDATED = "2026-10-26";
 const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
@@ -1719,9 +1726,9 @@ async function copyText(t, msgEl, okMsg) {
   }
 }
 
-function buildPdf() {
+function buildPdf(c = 0) {
   const { jsPDF } = window.jspdf; const doc = new jsPDF({ unit: "pt", format: "letter" });
-  const a = ac(), m = model(), W = 612, H = 792, M = 40, BOTTOM = H - M - 52; let y = M;
+  const a = ac(), m = model(), W = 612, H = 792, M = 36, BOTTOM = H - M - 52; let y = M + 6;
   const ensure = h => { if (y + h > BOTTOM) { doc.addPage(); y = M + 10; } };
   const when = new Date($("when").value || Date.now());
   doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(31, 95, 139); doc.text("AeroStratsLLC", M, y - 12);
@@ -1733,56 +1740,72 @@ function buildPdf() {
   doc.roundedRect(W - M - 150, y - 8, 150, 38, 4, 4, "FD"); doc.setTextColor(...(ok ? [29, 122, 70] : [180, 35, 24]));
   doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text(ok ? "WITHIN LIMITS" : "OUT OF LIMITS", W - M - 75, y + 16, { align: "center" });
   y += 44; doc.setTextColor(20);
+  // tighter levels shrink rows, type and charts until everything fits on one page
+  const rowH = [13, 12, 11, 10, 9.5][c], fs = [8.5, 8, 7.5, 7, 6.5][c], lh = [11.5, 10.5, 10, 9, 8.5][c], chScale = [1, 0.86, 0.74, 0.62, 0.5][c];
   // table
   // x of the left edge for the item column, right edges for the numeric columns
   const cols = [M + 2, 330, 395, 455, 515, W - M - 2], hdr = ["Item", "Weight lb", "Long. arm", "Lat. arm", "Long. mom", "Lat. mom"];
-  doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.setTextColor(90);
+  doc.setFontSize(fs); doc.setFont("helvetica", "bold"); doc.setTextColor(90);
   hdr.forEach((h, i) => doc.text(h, cols[i], y, { align: i ? "right" : "left" }));
-  y += 5; doc.setDrawColor(180); doc.line(M, y, W - M, y); y += 12; doc.setTextColor(20);
+  y += 5; doc.setDrawColor(180); doc.line(M, y, W - M, y); y += rowH - 2; doc.setTextColor(20);
   const line = (r, bold) => {
-    ensure(14); doc.setFont("helvetica", bold ? "bold" : "normal");
-    if (bold) { doc.setFillColor(242, 244, 246); doc.rect(M, y - 10, W - 2 * M, 14, "F"); }
+    ensure(rowH); doc.setFont("helvetica", bold ? "bold" : "normal");
+    if (bold) { doc.setFillColor(242, 244, 246); doc.rect(M, y - rowH + 3.5, W - 2 * M, rowH, "F"); }
     [r.label, fmt(r.w), fmt(r.arm, 2), fmt(r.lat, 2), fmt(r.lm, 0), fmt(r.tm, 0)].forEach((t, i) => doc.text(String(t), cols[i], y, { align: i ? "right" : "left" }));
-    y += 14;
+    y += rowH;
   };
   R.rows.forEach(r => line(r)); line({ label: "Zero usable fuel weight & CG", w: R.zf.w, arm: R.zf.cg, lat: R.zf.lcg, lm: R.zf.lm, tm: R.zf.tm }, true);
   R.fuelRows.forEach(r => line(r)); line({ label: "Takeoff gross weight & CG", w: R.to.w, arm: R.to.cg, lat: R.to.lcg, lm: R.to.lm, tm: R.to.tm }, true);
   line({ label: `Landing, ${RESERVE_MIN} min fuel (${fmt(R.landG)} gal)`, w: R.ld.w, arm: R.ld.cg, lat: R.ld.lcg, lm: R.ld.lm, tm: R.ld.tm }, true);
-  y += 10;
+  y += 8;
   // passenger manifest
   const mrows = manifestRows().filter(r => r.pic || r.name.trim() || r.person);
-  ensure(30 + mrows.length * 13);
-  doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(20); doc.text("Passenger manifest", M, y); y += 14;
+  ensure(26 + mrows.length * rowH);
+  doc.setFontSize(fs + 1.5); doc.setFont("helvetica", "bold"); doc.setTextColor(20); doc.text("Passenger manifest", M, y); y += rowH;
   const mc = [M + 2, 150, 330, 400, 455], mh = ["Seat", "Name", "Occupant lb", "Baggage lb", "Emergency contact"];
-  doc.setFontSize(8.5); doc.setTextColor(90); mh.forEach((h, i) => doc.text(h, mc[i], y, { align: i === 2 || i === 3 ? "right" : "left" }));
-  y += 5; doc.setDrawColor(180); doc.line(M, y, W - M, y); y += 11; doc.setTextColor(20); doc.setFont("helvetica", "normal");
+  doc.setFontSize(fs); doc.setTextColor(90); mh.forEach((h, i) => doc.text(h, mc[i], y, { align: i === 2 || i === 3 ? "right" : "left" }));
+  y += 5; doc.setDrawColor(180); doc.line(M, y, W - M, y); y += rowH - 2; doc.setTextColor(20); doc.setFont("helvetica", "normal");
   mrows.forEach(r => {
     const cells = [r.label + (r.pic ? " (PIC)" : ""), r.name.trim() || "—", r.person ? fmt(r.person, 0) : "—", r.bag ? fmt(r.bag, 0) : "—", r.contact.trim() || ""];
     cells.forEach((t, i) => doc.text(doc.splitTextToSize(String(t), i === 1 ? 170 : i === 4 ? W - M - mc[4] : 110)[0], mc[i], y, { align: i === 2 || i === 3 ? "right" : "left" }));
-    y += 13;
+    y += rowH;
   });
-  y += 8;
-  // charts side by side
-  const cw = (W - 2 * M - 12) / 2, chL = cw / 1.25;
-  ensure(chL + 30);
-  doc.addImage(chartImage(chartOpts(m, R, "long"), 400, 320), "JPEG", M, y, cw, chL);
-  doc.addImage(chartImage(chartOpts(m, R, "lat"), 400, 320), "JPEG", M + cw + 12, y, cw, chL);
-  doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(90);
-  doc.text(`Longitudinal CG  (TO = takeoff, LDG = landing ${RESERVE_MIN} min fuel, ZF = zero fuel)`, M, y + chL + 10);
-  doc.text("Lateral CG envelope  (+ = right side)", M + cw + 12, y + chL + 10);
-  y += chL + 26;
-  // checks
-  ensure(28); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(20); doc.text("Limit checks", M, y); y += 14;
-  doc.setFontSize(9); doc.setFont("helvetica", "normal");
-  R.checks.forEach(c => { ensure(13); doc.setTextColor(...(c.ok ? [29, 122, 70] : [180, 35, 24])); doc.text(c.ok ? "OK" : "FAIL", M, y); doc.setTextColor(20); doc.text(c.text, M + 30, y); y += 13; });
-  const perf = perfSummary();
-  if (perf.length) {
-    y += 4; ensure(26); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.setTextColor(20); doc.text("Performance (from POH charts)", M, y); y += 13;
-    doc.setFontSize(9); doc.setFont("helvetica", "normal");
-    perf.forEach(t => doc.splitTextToSize(t, W - 2 * M).forEach(s => { ensure(12); doc.text(s, M, y); y += 12; }));
-  }
+  y += 6;
+  // charts side by side, centred when shrunk
+  const cw = (W - 2 * M - 12) / 2 * chScale, chL = cw / 1.25, cx = (W - (2 * cw + 12)) / 2;
+  ensure(chL + 20);
+  doc.addImage(chartImage(chartOpts(m, R, "long"), 400, 320), "JPEG", cx, y, cw, chL);
+  doc.addImage(chartImage(chartOpts(m, R, "lat"), 400, 320), "JPEG", cx + cw + 12, y, cw, chL);
+  doc.setFontSize(7.5); doc.setFont("helvetica", "normal"); doc.setTextColor(90);
+  doc.text(doc.splitTextToSize(`Longitudinal CG (TO takeoff, LDG landing ${RESERVE_MIN} min fuel, ZF zero fuel)`, cw)[0], cx, y + chL + 9);
+  doc.text("Lateral CG envelope (+ = right side)", cx + cw + 12, y + chL + 9);
+  y += chL + 22;
+  // limit checks (left) and performance (right) side by side
+  const colW = (W - 2 * M - 18) / 2, x2 = M + colW + 18, perf = perfSummary();
+  const checkLines = R.checks.map(k => ({ k, t: doc.setFontSize(fs) && doc.splitTextToSize(k.text, colW - 28) }));
+  const perfLines = perf.flatMap(t => doc.splitTextToSize(t, perf.length ? colW : W - 2 * M));
+  const blockH = rowH + Math.max(checkLines.reduce((s, x) => s + x.t.length * lh, 0), perfLines.length * lh);
+  ensure(blockH);
+  const top = y;
+  doc.setFontSize(fs + 1.5); doc.setFont("helvetica", "bold"); doc.setTextColor(20); doc.text("Limit checks", M, y);
+  if (perf.length) doc.text("Performance (from POH charts)", x2, y);
+  y += rowH; doc.setFontSize(fs); doc.setFont("helvetica", "normal");
+  let yl = y;
+  checkLines.forEach(({ k, t }) => {
+    doc.setFont("helvetica", "bold"); doc.setTextColor(...(k.ok ? [29, 122, 70] : [180, 35, 24])); doc.text(k.ok ? "OK" : "FAIL", M, yl);
+    doc.setFont("helvetica", "normal"); doc.setTextColor(20); t.forEach((s, i) => doc.text(s, M + 28, yl + i * lh)); yl += t.length * lh;
+  });
+  let yr = y; perfLines.forEach(s => { doc.text(s, x2, yr); yr += lh; });
+  y = Math.max(yl, yr, top + rowH) + 4;
   const notes = $("notes").value.trim();
-  if (notes) { y += 4; ensure(26); doc.setFont("helvetica", "bold"); doc.text("Notes", M, y); y += 12; doc.setFont("helvetica", "normal"); doc.splitTextToSize(notes, W - 2 * M).forEach(t => { ensure(12); doc.text(t, M, y); y += 12; }); }
+  if (notes) {
+    const nl = doc.splitTextToSize(notes, W - 2 * M); ensure(rowH + Math.min(nl.length, 3) * lh);
+    doc.setFontSize(fs + 1.5); doc.setFont("helvetica", "bold"); doc.text("Notes", M, y); y += rowH; doc.setFontSize(fs); doc.setFont("helvetica", "normal");
+    nl.forEach(t => { ensure(lh); doc.text(t, M, y); y += lh; });
+  }
+  // still more than a page: try the next tighter level
+  if (doc.getNumberOfPages() > 1 && c < 4) return buildPdf(c + 1);
+  doc.fitLevel = c;
   // page numbers when it runs long
   const pages = doc.getNumberOfPages();
   if (pages > 1) for (let p = 1; p <= pages; p++) { doc.setPage(p); doc.setFontSize(8); doc.setTextColor(120); doc.text(`${a.tail} W&B · page ${p} of ${pages}`, W - M, H - 20, { align: "right" }); }
@@ -1850,13 +1873,27 @@ function buildPrintReport() {
       <figure><img alt="Longitudinal CG envelope" src="${chartImage(chartOpts(m, R, "long"), 400, 320)}"><figcaption>Longitudinal CG (TO = takeoff, LDG = landing ${RESERVE_MIN} min fuel, ZF = zero fuel)</figcaption></figure>
       <figure><img alt="Lateral CG envelope" src="${chartImage(chartOpts(m, R, "lat"), 400, 320)}"><figcaption>Lateral CG envelope (+ = right side)</figcaption></figure>
     </div>
-    <h2>Limit checks</h2>
-    <ul class="pr-checks">${R.checks.map(c => `<li class="${c.ok ? "" : "bad"}"><b>${c.ok ? "OK" : "FAIL"}</b>${esc(c.text)}</li>`).join("")}</ul>
-    ${perfSummary().length ? `<h2>Performance (from POH charts)</h2>${perfSummary().map(t => `<p style="margin:2px 0">${esc(t)}</p>`).join("")}` : ""}
-    ${notes ? `<h2>Notes</h2><p>${esc(notes)}</p>` : ""}
+    <div class="pr-two">
+      <div><h2>Limit checks</h2>
+      <ul class="pr-checks">${R.checks.map(c => `<li class="${c.ok ? "" : "bad"}"><b>${c.ok ? "OK" : "FAIL"}</b>${esc(c.text)}</li>`).join("")}</ul></div>
+      ${perfSummary().length ? `<div><h2>Performance (from POH charts)</h2><div class="pr-perf">${perfSummary().map(t => `<p>${esc(t)}</p>`).join("")}</div></div>` : ""}
+    </div>
+    ${notes ? `<h2>Notes</h2><p class="pr-notes">${esc(notes)}</p>` : ""}
     <div class="pr-sign"><div class="line"></div>PIC signature</div>
     <p class="pr-foot">Empty weight ${fmt(a.bew)} lb @ ${fmt(a.arm, 2)} in / ${fmt(a.lat, 2)} in lat (aircraft W&amp;B record${a.wbDate ? " dated " + esc(fmtDate(a.wbDate)) : ""}). Limits per Robinson ${m.name} POH. Verify before flight: check these results against the aircraft's POH and current W&amp;B record. The PIC is responsible for safe loading.</p>
     <p class="pr-company">Aeronautical Solutions and Strategies LLC</p>`;
+  fitPrintPage();
+}
+// One printed page: measure the report at the printable width of a Letter/A4 page and shrink it to fit the height.
+const PRINT_W = 718, PRINT_H = 930; // CSS px inside 12 mm margins (Letter width; the shorter of Letter/A4 heights, less a safety margin)
+function fitPrintPage() {
+  const pr = $("printReport");
+  pr.style.zoom = ""; pr.style.cssText += ";display:block;position:absolute;left:-10000px;top:0;width:" + PRINT_W + "px";
+  // chart images have a fixed aspect ratio in CSS, so the height is known before they load
+  const h = pr.scrollHeight, k = h > PRINT_H ? Math.max(0.5, PRINT_H / h) : 1;
+  pr.style.display = pr.style.position = pr.style.left = pr.style.top = pr.style.width = "";
+  pr.style.zoom = k < 1 ? String(Math.floor(k * 1000) / 1000) : "";
+  return k;
 }
 let reportReady = false;
 const onPrint = async () => {
