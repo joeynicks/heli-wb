@@ -645,7 +645,7 @@ const BUILTIN_FLEET = [
   { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "" }
 ];
 // APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
-const APP_BUILD = "20261110010135";
+const APP_BUILD = "20261110103229";
 const DATA_UPDATED = "2026-10-26";
 const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
@@ -833,7 +833,9 @@ function suggestFixes() {
   if (out.length - (R.to.w > m.maxGross + 1e-9 ? 1 : 0) === 0 && tested === 0) {
     const bad = R.checks.filter(c => !c.ok && !c.warn).map(c => c.short).join(" ");
     const dir = /forward of limit/.test(bad) ? " Move weight aft." : /aft of limit/.test(bad) ? " Move weight forward." : /lateral/.test(bad) ? " Balance weight left and right." : "";
-    out.push(`No single fuel or baggage change fixes the CG.${dir || " Move weight between seats or reduce the load."}`);
+    // when it is also over max gross, the weight has to come off first: no CG advice until then
+    out.push(R.to.w > m.maxGross + 1e-9 ? "Removing fuel alone does not bring it within limits. Reduce people or baggage."
+      : `No single fuel or baggage change fixes the CG.${dir || " Move weight between seats or reduce the load."}`);
   }
   return out;
 }
@@ -1390,11 +1392,19 @@ function byOat(oats, oat, f) {
 }
 const bracket = (arr, v) => { if (v <= arr[0]) return [0, 0]; for (let i = 1; i < arr.length; i++) if (v <= arr[i]) return v === arr[i] ? [i, i] : [i - 1, i]; return [arr.length - 1, arr.length - 1]; };
 // placard speeds: the most restrictive surrounding cell; any no-flight cell means no flight
+// Outside the table is reported as such (it is not the same as a NO FLIGHT cell).
 function tableLow(tab, alts, oats, pa, oat) {
-  if (pa > alts[alts.length - 1] || oat > oats[oats.length - 1] || oat < oats[0]) return null;
-  const [r0, r1] = bracket(alts, Math.max(pa, 0)), [c0, c1] = bracket(oats, oat);
-  const cells = [tab[r0][c0], tab[r0][c1], tab[r1][c0], tab[r1][c1]];
-  return cells.some(x => x == null) ? null : Math.min(...cells);
+  if (pa > alts[alts.length - 1]) return { v: null, why: `Above the placard (${alts[alts.length - 1].toLocaleString()} ft)` };
+  if (oat > oats[oats.length - 1]) return { v: null, why: `Warmer than the placard (${oats[oats.length - 1]} °C)` };
+  const [r0, r1] = bracket(alts, Math.max(pa, 0));
+  if (oat < oats[0]) {
+    // colder than the first column: that column is used only where the placard shows speeds holding or rising as it gets colder
+    const ok = [r0, r1].every(r => tab[r][0] != null && tab[r][1] != null && tab[r][0] >= tab[r][1]);
+    return ok ? { v: Math.min(tab[r0][0], tab[r1][0]), note: `OAT is colder than the placard: the ${oats[0]} °C column is used.` }
+              : { v: null, why: `Colder than the placard (${oats[0]} °C)` };
+  }
+  const [c0, c1] = bracket(oats, oat), cells = [tab[r0][c0], tab[r0][c1], tab[r1][c0], tab[r1][c1]];
+  return cells.some(x => x == null) ? { v: null, why: "No flight per placard" } : { v: Math.min(...cells) };
 }
 // MAP schedule: interpolated; a full-throttle cell nearby means full throttle
 function mapAt(t, pa, oat) {
@@ -1439,15 +1449,17 @@ function computePerf() {
     // lines that end at max gross are read to within a few pounds of it: treat that as max gross
     const maxW = mw.v == null ? null : (mw.v >= m.maxGross - 5 ? m.maxGross : mw.v) - windLb;
     if (mw.v == null && !mw.why) mw.why = "beyond the chart at this altitude and OAT";
-    res[k] = { maxW, margin: maxW == null ? null : maxW - w, ceiling: ceil.v, why: mw.why, note: mw.note || "", windLb, atGross: mw.v != null && mw.v >= m.maxGross - 5 };
+    // lighter than where the lines start, the ceiling is at least the top of the line, not equal to it
+    const top = byOat(oats, res.oatHover, i => chart.lines[i][0][1]);
+    res[k] = { maxW, margin: maxW == null ? null : maxW - w, ceiling: ceil.v, ceilingGt: ceil.v != null && top.v != null && ceil.v >= top.v - 1, why: mw.why, note: mw.note || "", windLb, atGross: mw.v != null && mw.v >= m.maxGross - 5 };
   }
   res.ctrlDA = h.ctrlDA;
   if (d.map) { const t = mapAt(d.map, pa, oat); res.map = { mcp: t.v, to: t.v == null ? null : t.v + d.map.toAdd, ft: !!t.ft, why: t.why, note: t.note || "", toAdd: d.map.toAdd }; }
-  const v = d.vne, base = tableLow(v.v, v.alts, v.oats, pa, oat);
-  let vne = base == null ? null : base + (v.heavy && w > 2200 ? v.heavy : 0) + (v.light && w < 2200 ? v.light : 0);
-  const auto = v.autoTable ? tableLow(v.autoTable, v.alts, v.oats, pa, oat) : (base != null && v.auto != null ? base + v.auto : null);
-  const doorsOff = Object.keys(load().rm).some(k => load().rm[k] && /door/i.test((m.removals.find(r => r.key === k) || {}).label || ""));
-  res.vne = { power: vne, auto, doorsOff, doorsCap: v.doorsOff, hasAuto: v.auto != null || !!v.autoTable };
+  const v = d.vne, bt = tableLow(v.v, v.alts, v.oats, pa, oat), base = bt.v;
+  const vne = base == null ? null : base + (v.heavy && w > 2200 ? v.heavy : 0) + (v.light && w < 2200 ? v.light : 0);
+  const at = v.autoTable ? tableLow(v.autoTable, v.alts, v.oats, pa, oat) : { v: base != null && v.auto != null ? base + v.auto : null, why: bt.why };
+  const rm = load().rm, doorsOff = m.removals.some(r => rm[r.key] && /door/i.test(r.label));
+  res.vne = { power: vne, auto: at.v, why: bt.why, autoWhy: at.why, note: bt.note || "", doorsOff, doorsCap: v.doorsOff, hasAuto: v.auto != null || !!v.autoTable };
   if (d.climb) {
     const c = d.climb, cw = Math.min(Math.max(w, 2200), 2700), lo = climbAt(c, "w2200", pa, oat), hi = climbAt(c, "w2700", pa, oat);
     const t = (cw - 2200) / 500;
@@ -1489,7 +1501,7 @@ function renderPerf() {
     const card = (title, r) => {
       const chip = r.maxW == null ? `<span class="chipbad">${esc(r.why || "off chart")}</span>` : r.margin >= 0 ? `<span class="chipok">OK, ${lb(r.margin)} margin</span>` : `<span class="chipbad">Over by ${lb(-r.margin)}</span>`;
       const max = r.maxW == null ? "–" : (r.atGross ? `${lb(r.maxW)} (max gross${r.windLb ? " less wind allowance" : ""})` : lb(r.maxW));
-      const ceil = r.ceiling == null ? "above max gross" : ft(r.ceiling);
+      const ceil = r.ceiling == null ? "off chart" : (r.ceilingGt ? "over " : "") + ft(r.ceiling);
       return `<div class="pcard"><b>${title}</b>${chip}<span>Max hover weight</span><span class="num">${max}</span><span>Hover ceiling at ${lb(PR.w)}</span><span class="num">${ceil} PA</span>${r.note ? `<span class="sub">${esc(r.note)}</span>` : ""}</div>`;
     };
     let extra = "";
@@ -1510,10 +1522,10 @@ function renderPerf() {
     }
     // Vne
     const vr = PR.vne, cap = s => vr.doorsOff && vr.doorsCap != null && s != null ? Math.min(s, vr.doorsCap) : s;
-    const vtxt = s => s == null ? "No flight per placard" : `${Math.round(s)} KIAS`;
-    $("pVne").innerHTML = `<table class="ptable"><tr><td>Power on${a.model === "R66" ? (PR.w < 2200 ? " (below 2,200 lb, +10)" : "") : (d.vne.heavy && PR.w > 2200 ? " (over 2,200 lb, −10)" : "")}</td><td class="num">${vtxt(cap(vr.power))}</td></tr>`
-      + (vr.hasAuto ? `<tr><td>Autorotation</td><td class="num">${vtxt(cap(vr.auto))}</td></tr>` : "")
-      + `</table>${vr.doorsOff && vr.doorsCap ? `<p class="hint" style="margin:6px 0 0">Doors removed: ${vr.doorsCap} KIAS maximum.</p>` : ""}<p class="hint" style="margin:6px 0 0">Most restrictive placard value around your altitude and OAT.</p>`;
+    const vtxt = (s, why) => s == null ? esc(why || "No flight per placard") : `${Math.round(s)} KIAS`;
+    $("pVne").innerHTML = `<table class="ptable"><tr><td>Power on${a.model === "R66" ? (PR.w < 2200 ? " (below 2,200 lb, +10)" : "") : (d.vne.heavy && PR.w > 2200 ? " (over 2,200 lb, −10)" : "")}</td><td class="num">${vtxt(cap(vr.power), vr.why)}</td></tr>`
+      + (vr.hasAuto ? `<tr><td>Autorotation</td><td class="num">${vtxt(cap(vr.auto), vr.autoWhy)}</td></tr>` : "")
+      + `</table>${vr.doorsOff && vr.doorsCap ? `<p class="hint" style="margin:6px 0 0">Doors removed: ${vr.doorsCap} KIAS maximum.</p>` : ""}${vr.note ? `<p class="hint" style="margin:6px 0 0">${esc(vr.note)}</p>` : ""}<p class="hint" style="margin:6px 0 0">Most restrictive placard value around your altitude and OAT.</p>`;
     // climb (R66)
     $("pClimbBox").hidden = !PR.climb;
     if (PR.climb) {
@@ -1615,7 +1627,7 @@ function perfSummary() {
   if (r.map) out.push(r.map.ft || r.map.mcp == null ? "MAP: full throttle" : `MAP limit: MCP ${fmt(r.map.mcp)} in Hg, takeoff (5 min) ${fmt(r.map.to)} in Hg`);
   else out.push("Torque: 100% (5 min), 83% continuous · MGT 782 °C (5 min), 706 °C continuous");
   const cap = s => r.vne.doorsOff && r.vne.doorsCap != null && s != null ? Math.min(s, r.vne.doorsCap) : s;
-  out.push(`Vne: ${r.vne.power == null ? "no flight per placard" : Math.round(cap(r.vne.power)) + " KIAS"}${r.vne.hasAuto && r.vne.auto != null ? `, autorotation ${Math.round(cap(r.vne.auto))} KIAS` : ""}${r.climb && r.climb.v != null ? ` · Climb ${r.climb.gt ? "over " : ""}${Math.round(r.climb.v)} ft/min` : ""}`);
+  out.push(`Vne: ${r.vne.power == null ? (r.vne.why || "No flight per placard").replace(/^./, ch => ch.toLowerCase()) : Math.round(cap(r.vne.power)) + " KIAS"}${r.vne.hasAuto && r.vne.auto != null ? `, autorotation ${Math.round(cap(r.vne.auto))} KIAS` : ""}${r.climb && r.climb.v != null ? ` · Climb ${r.climb.gt ? "over " : ""}${Math.round(r.climb.v)} ft/min` : ""}`);
   return out;
 }
 
@@ -1683,7 +1695,7 @@ async function getWeather(e) {
     for (const id of raw.length === 3 && /^[A-Z]{3}$/.test(raw) ? ["K" + raw, raw] : [raw]) { w = await fetchObs(id); if (w) break; }
     if (!w) { showWxMsg(`No weather station found for ${raw}. Use the identifier of a nearby airport with ASOS/AWOS weather, or enter the conditions below.`, true); return; }
     if (w.none) { showWxMsg(`${w.id} has no recent temperature and altimeter report. Try a nearby airport, or enter the conditions below.`, true); return; }
-    Object.assign(PI, { mode: "field", elev: w.elevFt == null ? PI.elev : String(Math.round(w.elevFt)), alt: w.alt.toFixed(2), oat: String(Math.round(w.temp)), wx: w });
+    Object.assign(PI, { mode: "field", elev: w.elevFt == null ? PI.elev : String(Math.round(w.elevFt)), alt: w.alt.toFixed(2), oat: String(+w.temp.toFixed(1)), wx: w });
     ["pMode", "pElev", "pAlt", "pOAT"].forEach((id, i) => $(id).value = PI[["mode", "elev", "alt", "oat"][i]]);
     savePerf(); renderPerf(); showWxMsg();
   } catch (err) {
