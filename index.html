@@ -20,7 +20,7 @@ if ("serviceWorker" in navigator) {
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AeroStrats W&amp;B">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 /* Layout: sticky status strip over a two-column cockpit (loading left, envelope charts right); one column on phones. */
@@ -43,7 +43,10 @@ if ("serviceWorker" in navigator) {
   --ok:#4cc38a; --ok-bg:#12301f; --bad:#ff7b72; --bad-bg:#3a1513; --warn:#e3b341; color-scheme:dark}
 
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+/* never fake a bold or italic the fonts don't ship: synthesized weights render soft and fuzzy */
+html{font-synthesis:none;-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+b,strong{font-weight:600}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
 .wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 40px}
 h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:.01em;margin:0;text-wrap:balance}
@@ -76,7 +79,7 @@ h2{font-size:1.15rem;text-transform:uppercase;letter-spacing:.06em;color:var(--m
 .verdict.bad{background:var(--bad-bg);color:var(--bad)}
 .verdict.pending{background:var(--field);color:var(--warn)}
 .reason{grid-column:1/-1;padding:7px 14px;font-size:.86rem;line-height:1.35;border-top:1px solid var(--line);background:var(--bad-bg);color:var(--bad)}
-.reason b{font-weight:700}
+.reason b{font-weight:600}
 .reason.pending{background:var(--field);color:var(--warn)}
 .readouts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 12px;padding:8px 14px;align-items:center}
 .ro b{display:block;font:500 .68rem var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
@@ -104,6 +107,13 @@ h2{font-size:1.15rem;text-transform:uppercase;letter-spacing:.06em;color:var(--m
 .seatgroup{border-top:1px dashed var(--line);padding-top:8px}
 .seatgroup:first-child{border-top:0;padding-top:0}
 .seatwarn{color:var(--bad);font-size:.78rem;font-weight:600}
+/* people are the main entry: bolder label, outlined box; baggage sits smaller and indented under its seat */
+.row.person label{font-weight:600;font-size:1rem}
+.row.person .stepper{border:1.5px solid var(--accent)}
+.row.bag{padding-left:12px;border-left:2px solid var(--line);margin-left:2px}
+.row.bag label{font-weight:400;font-size:.85rem;color:var(--muted)}
+.row.need .stepper{border-color:var(--warn);box-shadow:0 0 0 3px color-mix(in srgb,var(--warn) 22%,transparent)}
+.row.need label::after{content:"Enter weight";display:block;font:600 .72rem var(--body);color:var(--warn);margin-top:1px}
 .name-in{grid-column:1/-1;font:inherit;font-size:16px;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
 
 /* fuel */
@@ -152,7 +162,7 @@ th:first-child,td:first-child{text-align:left;white-space:normal}
 th{font:500 .68rem var(--body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 td{font-family:var(--mono);font-variant-numeric:tabular-nums}
 td:first-child{font-family:var(--body)}
-tr.total td{font-weight:600;border-top:2px solid var(--ink);background:var(--field)}
+tr.total td{font-weight:700;border-top:2px solid var(--ink);background:var(--field)}
 
 /* form fields */
 .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -527,7 +537,7 @@ const BUILTIN_FLEET = [
   { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "" }
 ];
 // APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
-const APP_BUILD = "20261109230841";
+const APP_BUILD = "20261109233738";
 const DATA_UPDATED = "2026-10-26";
 const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
@@ -547,9 +557,14 @@ const S = {
   tailId: store.get("tail", null),
   loads: store.get("loads", {}),
   pilot: store.get("pilot", ""),       // PIC name on this phone
-  pilotWt: store.get("pilotWt", 0),    // last pilot weight entered on this phone; 0 = ask
   burn: store.get("burn", {})          // fuel burn (gal/hr) per aircraft id, when changed from the model default
 };
+// Weights are never carried into a new flight: loadings saved by older versions (which assumed a
+// 170/175 lb pilot) are dropped once, and a loading untouched for LOAD_TTL_H hours starts blank.
+const LOADS_VERSION = 2, LOAD_TTL_H = 12;
+if (store.get("loadsVer", 1) < LOADS_VERSION || Date.now() - store.get("loadsAt", 0) > LOAD_TTL_H * 3600e3) S.loads = {};
+store.set("loadsVer", LOADS_VERSION);
+let savedLoads = JSON.stringify(S.loads);
 // phones from before this change kept the whole fleet under "fleet": keep only what the pilot added
 if (!S.custom) S.custom = (store.get("fleet", []) || []).filter(a => !isBuiltin(a.id) && !RETIRED_IDS.includes(a.id));
 RETIRED_IDS.forEach(id => delete S.loads[id]);
@@ -567,16 +582,14 @@ const model = () => MODELS[ac().model];
 
 const burnRate = a => S.burn[a.id] || MODELS[a.model].burn;
 function freshLoad(m) {
-  // no assumed pilot weight: use this phone's last entry, otherwise leave it for the pilot to enter
-  const st = {}; m.stations.forEach(s => st[s.key] = s.key === "pilot" ? (S.pilotWt || 0) : 0);
+  // every weight starts blank, the pilot's included: nothing is assumed
+  const st = {}; m.stations.forEach(s => st[s.key] = 0);
   return { st, rm: {}, main: m.main.usable, auxAuto: true, aux: m.aux ? m.aux.usable : 0, mf: {} };
 }
 function load() {
   const a = ac(), m = model();
   if (!S.loads[a.id]) S.loads[a.id] = freshLoad(m);
   if (!S.loads[a.id].mf) S.loads[a.id].mf = {};
-  // an empty pilot seat picks up the weight this phone's pilot entered elsewhere
-  if (!num(S.loads[a.id].st.pilot) && S.pilotWt) S.loads[a.id].st.pilot = S.pilotWt;
   return S.loads[a.id];
 }
 const pilotSeat = m => m.stations.find(s => s.key === "pilot").seat;
@@ -590,7 +603,12 @@ function manifestRows() {
     return { seat: k, label: m.seats[k], pic: k === ps, name: k === ps ? S.pilot : (e.name || ""), contact: e.contact || "", person, bag };
   });
 }
-function saveState() { store.set("custom", S.custom); store.set("tail", S.tailId); store.set("loads", S.loads); store.set("pilot", S.pilot); store.set("pilotWt", S.pilotWt); store.set("burn", S.burn); }
+function saveState() {
+  store.set("custom", S.custom); store.set("tail", S.tailId); store.set("loads", S.loads); store.set("pilot", S.pilot); store.set("burn", S.burn);
+  // the 12-hour clock restarts only when a loading actually changes, not each time the app opens
+  const j = JSON.stringify(S.loads);
+  if (j !== savedLoads) { savedLoads = j; store.set("loadsAt", Date.now()); }
+}
 
 /* ---------- math ---------- */
 function auxFromMain(m, g) {
@@ -829,20 +847,20 @@ function renderStations() {
   Object.keys(m.seats).forEach(k => {
     const g = document.createElement("div"); g.className = "seatgroup rows";
     m.stations.filter(s => s.seat === k).forEach(s => {
-      const r = document.createElement("div"); r.className = "row";
+      const r = document.createElement("div"); r.className = "row " + (s.bag ? "bag" : "person");
       const id = "st_" + s.key, isPilot = s.key === "pilot";
       r.innerHTML = `<label for="${id}">${s.label}<span class="arm">${fmt(s.arm)} in · ${latStr(s.lat)}</span></label>`;
-      r.append(stepper(id, L.st[s.key], v => { L.st[s.key] = v; if (isPilot) S.pilotWt = v; update(); }, s.bag ? 1 : 5));
+      r.append(stepper(id, L.st[s.key], v => { L.st[s.key] = v; update(); }, s.bag ? 1 : 5));
       if (isPilot) r.querySelector("input").placeholder = "Enter";
       if (!s.bag) {
-        // the person's name sits with their weight; the pilot's name is the PIC
+        // the person's name heads their seat, above the weight; the pilot's name is the PIC
         const n = document.createElement("input");
         n.className = "name-in"; n.id = "nm_" + k; n.autocomplete = isPilot ? "name" : "off";
         n.placeholder = isPilot ? "Pilot in command name" : "Passenger name (optional)";
         n.value = isPilot ? S.pilot : ((L.mf[k] || {}).name || "");
         n.setAttribute("aria-label", `${m.seats[k]} name`);
         n.addEventListener("input", () => { if (isPilot) S.pilot = n.value; else (L.mf[k] = L.mf[k] || {}).name = n.value; update(); renderManifest(); });
-        r.append(n);
+        r.prepend(n);
       }
       g.append(r);
     });
@@ -854,7 +872,7 @@ function renderStations() {
   if (extra.length) {
     const g = document.createElement("div"); g.className = "seatgroup rows";
     extra.forEach(s => {
-      const r = document.createElement("div"), id = "st_" + s.key; r.className = "row";
+      const r = document.createElement("div"), id = "st_" + s.key; r.className = "row bag";
       r.innerHTML = `<label for="${id}">${s.label}<span class="arm">${fmt(s.arm)} in · ${latStr(s.lat)}</span></label>`;
       r.append(stepper(id, L.st[s.key], v => { L.st[s.key] = v; update(); }, 1));
       g.append(r);
@@ -897,7 +915,7 @@ function updateManifestWeights() {
 $("mfClear").onclick = () => { load().mf = {}; renderStations(); renderManifest(); update(); };
 
 // New flight: every aircraft back to a fresh loading (full fuel, nothing removed, no passengers);
-// the PIC name, the phone's pilot weight and fuel-burn settings stay.
+// all weights are blank again; the PIC name and fuel-burn settings stay.
 let nfTimer;
 $("newFlight").onclick = e => {
   const b = e.currentTarget; clearTimeout(nfTimer);
@@ -968,6 +986,7 @@ function update() {
     v.className = "verdict ok"; v.innerHTML = "Within<br>limits";
     rs.className = "reason pending"; rs.hidden = !firstWarn; if (firstWarn) rs.textContent = firstWarn.short;
   }
+  const pr = $("st_pilot") && $("st_pilot").closest(".row"); if (pr) pr.classList.toggle("need", R.incomplete);
   $("fixes").hidden = !fixes.length;
   $("fixList").innerHTML = fixes.map(f => `<li>${esc(f)}</li>`).join("");
   $("roW").textContent = fmt(R.to.w) + " lb";
