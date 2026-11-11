@@ -10,7 +10,26 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <script>
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  // A new version takes over as soon as it is published: the update check skips the browser cache, runs on every
+  // open and every return to the app, and the page reloads onto the new version (or offers to, if mid-use).
+  const hadController = !!navigator.serviceWorker.controller, openedAt = Date.now();
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloading) return;
+    if (Date.now() - openedAt < 20000 || document.visibilityState === "hidden") { reloading = true; location.reload(); return; }
+    if (document.getElementById("swUpdate")) return;
+    const b = document.createElement("button"); b.id = "swUpdate"; b.type = "button";
+    b.textContent = "A new version is ready. Tap to reload.";
+    b.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));z-index:50;font:600 14px system-ui,sans-serif;padding:10px 16px;border-radius:999px;border:0;background:#1f5f8b;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25)";
+    b.onclick = () => { reloading = true; location.reload(); };
+    document.body.append(b);
+  });
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(reg => {
+      reg.update().catch(() => {});
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+    }).catch(() => {});
+  });
 }
 </script>
 </head>
@@ -689,7 +708,7 @@ const BUILTIN_FLEET = [
   { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "2024-01-04" }
 ];
 // APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
-const APP_BUILD = "20261110205042";
+const APP_BUILD = "20261110210715";
 const DATA_UPDATED = "2026-11-10";
 const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);

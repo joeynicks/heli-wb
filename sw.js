@@ -1,4 +1,4 @@
-const CACHE = "wb-20261110205042";
+const CACHE = "wb-20261110210715";
 const CORE = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png",
@@ -21,7 +21,8 @@ self.addEventListener("fetch", e => {
     e.respondWith((async () => {
       const cache = await caches.open(CACHE);
       try {
-        const res = await Promise.race([fetch(req), new Promise((_, rej) => setTimeout(rej, 3000))]);
+        // "no-cache" makes the browser check with GitHub every time instead of reusing a copy for up to 10 minutes
+        const res = await Promise.race([fetch(new Request(req.url, { cache: "no-cache", credentials: "same-origin" })), new Promise((_, rej) => setTimeout(rej, 5000))]);
         if (res && res.ok) cache.put("./index.html", res.clone());
         return res;
       } catch (err) {
