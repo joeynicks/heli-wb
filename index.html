@@ -476,6 +476,9 @@ details.panel>summary{list-style-position:inside}
             <label class="field">Takeoff weight (lb)<input id="pWt" type="number" inputmode="decimal" step="1"></label>
           </div>
           <p class="hint" style="margin:0" id="pWtHint"></p>
+          <div id="pCarbBox" class="fields" hidden>
+            <label class="toggle"><input type="checkbox" id="pCarb"> <span id="pCarbLbl">Full carb heat</span></label>
+          </div>
           <div id="pR66" class="fields" hidden>
             <label class="toggle"><input type="checkbox" id="pAnti"> Engine anti-ice on</label>
             <label class="toggle"><input type="checkbox" id="pHeat"> Full cabin heat</label>
@@ -686,7 +689,7 @@ const BUILTIN_FLEET = [
   { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "2024-01-04" }
 ];
 // APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
-const APP_BUILD = "20261110204247";
+const APP_BUILD = "20261110205042";
 const DATA_UPDATED = "2026-11-10";
 const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
@@ -1457,7 +1460,7 @@ PERF.R22B = {
 })();
 
 /* ---------- performance calculations ---------- */
-const PI = Object.assign({ mode: "pa", pa: "", elev: "", alt: "", oat: "", wt: "", anti: false, heat: false, amps: 50, wind: false, chart: "ige" }, store.get("perf", {}));
+const PI = Object.assign({ mode: "pa", pa: "", elev: "", alt: "", oat: "", wt: "", anti: false, heat: false, amps: 50, wind: false, carb: false, chart: "ige" }, store.get("perf", {}));
 let PR = null; // latest performance result, also used by the PDF and printout
 const savePerf = () => store.set("perf", PI);
 function pressAlt() {
@@ -1558,15 +1561,19 @@ function computePerf() {
   const h = d.hover, turbine = !!h.turbine;
   // R66 chart notes: anti-ice +10 °C, full cabin heat +20 °C, +1 °C per 20 A over 50 A; wind up to 17 kt costs 100 lb IGE / 50 lb OGE
   res.oatHover = turbine ? oat + (PI.anti ? 10 : 0) + (PI.heat ? 20 : 0) + Math.max(0, num(PI.amps) - 50) / 20 : oat;
+  // full carburetor heat lowers hover ceilings by up to d.carb ft (POH p. 5-1): the charts are read that much higher,
+  // which is the same as moving every line down by it (the conservative, full-amount case)
+  res.carb = d.carb && PI.carb ? d.carb : 0;
+  const paHover = pa + res.carb;
   for (const k of ["ige", "oge"]) {
     const chart = h[k], oats = chart.oats || h.oats, windLb = turbine && PI.wind ? chart.wind : 0;
-    const mw = byOat(oats, res.oatHover, i => lineW(chart.lines[i], pa));
-    const ceil = byOat(oats, res.oatHover, i => lineH(chart.lines[i], Math.min(w + windLb, m.maxGross)));
+    const mw = byOat(oats, res.oatHover, i => lineW(chart.lines[i], paHover));
+    const ceil = byOat(oats, res.oatHover, i => { const v = lineH(chart.lines[i], Math.min(w + windLb, m.maxGross)); return v == null ? null : v - res.carb; });
     // lines that end at max gross are read to within a few pounds of it: treat that as max gross
     const maxW = mw.v == null ? null : (mw.v >= m.maxGross - 5 ? m.maxGross : mw.v) - windLb;
     if (mw.v == null && !mw.why) mw.why = "beyond the chart at this altitude and OAT";
     // lighter than where the lines start, the ceiling is at least the top of the line, not equal to it
-    const top = byOat(oats, res.oatHover, i => chart.lines[i][0][1]);
+    const top = byOat(oats, res.oatHover, i => chart.lines[i][0][1] - res.carb);
     res[k] = { maxW, margin: maxW == null ? null : maxW - w, ceiling: ceil.v, ceilingGt: ceil.v != null && top.v != null && ceil.v >= top.v - 1, why: mw.why, note: mw.note || "", windLb, atGross: mw.v != null && mw.v >= m.maxGross - 5 };
   }
   res.ctrlDA = h.ctrlDA;
@@ -1593,6 +1600,9 @@ function renderPerf() {
   PR = computePerf();
   $("pModel").textContent = `${a.tail} · Robinson ${m.name}`;
   $("pR66").hidden = !d.hover.turbine;
+  // carbureted models only (R22, R22 Beta, R44, Cadet); the R44 II is fuel injected and the R66 a turbine
+  $("pCarbBox").hidden = !d.carb;
+  if (d.carb) $("pCarbLbl").textContent = `Full carb heat (hover ceilings up to ${d.carb.toLocaleString()} ft lower)`;
   $("pPaBox").hidden = PI.mode !== "pa"; $("pElevBox").hidden = $("pAltBox").hidden = PI.mode !== "field";
   const wb = R && !R.incomplete ? R.to.w : null;
   $("pWt").placeholder = wb ? String(Math.round(wb * 10) / 10) : "Enter";
@@ -1627,7 +1637,8 @@ function renderPerf() {
     };
     let extra = "";
     if (PR.da > PR.ctrlDA) extra = `<div class="pcard"><span class="chipwarn">Above ${PR.ctrlDA.toLocaleString()} ft DA</span><span class="sub">${d.hover.turbine ? "Hover performance is only substantiated up to 11,000 ft density altitude." : `Hover controllability in a 17 kt wind is only substantiated up to ${PR.ctrlDA.toLocaleString()} ft density altitude.`}</span></div>`;
-    const adj = d.hover.turbine && PR.oatHover !== PR.oat ? `<p class="hint" style="margin:0">Charts read at ${fmt(PR.oatHover)} °C (OAT corrected for anti-ice, cabin heat and generator load).</p>` : "";
+    const adj = (d.hover.turbine && PR.oatHover !== PR.oat ? `<p class="hint" style="margin:0">Charts read at ${fmt(PR.oatHover)} °C (OAT corrected for anti-ice, cabin heat and generator load).</p>` : "")
+      + (PR.carb ? `<p class="hint" style="margin:0">Full carb heat: hover ceilings lowered by ${PR.carb.toLocaleString()} ft, the most the POH allows for.</p>` : "");
     $("pHover").innerHTML = card("In ground effect (2 ft skid height)", PR.ige) + card("Out of ground effect", PR.oge) + extra + adj;
     // power
     if (PR.map) {
@@ -1729,7 +1740,8 @@ function hoverChartOpts(kind) {
       for (let hh = Math.min(A[0][1], B[0][1]); hh >= Math.max(chart.axes.y[0], Math.min(A[A.length - 1][1], B[B.length - 1][1])); hh -= 100) {
         const wa = lineW(A, hh), wb = lineW(B, hh); if (wa != null && wb != null) pts.push([wa + f * (wb - wa), hh]);
       }
-      if (pts.length > 1) o.lines.push({ pts, hi: true });
+      // with carb heat on, the line for your OAT is drawn lower by the POH's ceiling loss
+      if (pts.length > 1) o.lines.push({ pts: PR.carb ? pts.map(([pw, ph]) => [pw, ph - PR.carb]) : pts, hi: true });
     }
     o.marks.push({ x: PR.w, y: PR.pa, ok: r.margin != null && r.margin >= 0, label: "You" });
     if (r.maxW != null) o.marks.push({ x: r.maxW + (r.windLb || 0), y: PR.pa, ok: true, shape: "diamond", label: "Max" });
@@ -1779,7 +1791,7 @@ function perfSummary() {
   const r = PR, out = [`Pressure altitude ${ft(r.pa)}, OAT ${fmt(r.oat)} °C, density altitude ${ft(r.da)}, weight ${lb(r.w)}`];
   if (PI.wx) out.unshift(`Weather: ${wxLine(PI.wx)}`);
   const hv = (n, x) => `${n}: ${x.maxW == null ? (x.why || "off chart") : `max ${lb(x.maxW)}, ${x.margin >= 0 ? "margin " + lb(x.margin) : "OVER by " + lb(-x.margin)}`}`;
-  out.push(hv("IGE hover", r.ige) + " · " + hv("OGE hover", r.oge));
+  out.push(hv("IGE hover", r.ige) + " · " + hv("OGE hover", r.oge) + (r.carb ? ` (full carb heat, ceilings −${r.carb.toLocaleString()} ft)` : ""));
   if (r.map) { const mp = r.map, lim = (v, full) => full || v == null ? "full throttle" : fmt(v) + " in Hg";
     out.push(mp.why ? `MAP limit: ${mp.why}` : mp.mcpFt && mp.toFt ? "MAP: full throttle" : `MAP limit: MCP ${lim(mp.mcp, mp.mcpFt)}, takeoff (5 min) ${lim(mp.to, mp.toFt)}`); }
   else out.push("Torque: 100% (5 min), 83% continuous · MGT 782 °C (5 min), 706 °C continuous");
@@ -1898,7 +1910,7 @@ $("pWxForm").addEventListener("submit", getWeather);
 $("pApt").value = PI.apt || "";
 showWxMsg();
 [["pMode", "mode"], ["pPA", "pa"], ["pElev", "elev"], ["pAlt", "alt"], ["pOAT", "oat"], ["pWt", "wt"], ["pAmps", "amps"]].forEach(([id, k]) => bindPerf(id, k));
-[["pAnti", "anti"], ["pHeat", "heat"], ["pWind", "wind"]].forEach(([id, k]) => bindPerf(id, k, "check"));
+[["pAnti", "anti"], ["pHeat", "heat"], ["pWind", "wind"], ["pCarb", "carb"]].forEach(([id, k]) => bindPerf(id, k, "check"));
 const setChart = k => { PI.chart = k; savePerf(); $("pSegIGE").setAttribute("aria-pressed", k === "ige"); $("pSegOGE").setAttribute("aria-pressed", k === "oge"); paintPerfCharts(); };
 $("pSegIGE").onclick = () => setChart("ige"); $("pSegOGE").onclick = () => setChart("oge");
 setChart(PI.chart);

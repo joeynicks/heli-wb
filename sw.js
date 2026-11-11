@@ -1,4 +1,4 @@
-const CACHE = "wb-20261110204247";
+const CACHE = "wb-20261110205042";
 const CORE = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png",
