@@ -507,6 +507,11 @@ details.panel>summary{list-style-position:inside}
           <canvas class="chart" id="chartHover" role="img" aria-label="Hover ceiling versus gross weight chart"></canvas>
           <p class="hint" style="margin:0" id="pChartNote"></p>
         </section>
+        <section class="panel" id="pHVBox">
+          <div class="panel-h"><h2>Height-velocity diagram</h2><span class="hint">Avoid the shaded areas</span></div>
+          <canvas class="chart" id="chartHV" role="img" aria-label="Height-velocity diagram: height above ground versus indicated airspeed"></canvas>
+          <p class="hint" style="margin:0" id="pHVNote"></p>
+        </section>
         <section class="panel" id="pClimbBox" hidden>
           <h2>Climb at max continuous power</h2>
           <div id="pClimb"></div>
@@ -677,12 +682,12 @@ MODELS.R44C = {
    Empty-weight moments as recorded in the worksheets. */
 const BUILTIN_FLEET = [
   // wbDate: date of the aircraft's current weight & balance record (YYYY-MM-DD); blank until provided
-  { id: "N7187K", tail: "N7187K", model: "R22", bew: 895.2,  arm: 92706 / 895.2,   lat: -354 / 895.2,      wbDate: "" },
-  { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "" }
+  { id: "N7187K", tail: "N7187K", model: "R22", bew: 895.2,  arm: 92706 / 895.2,   lat: -354 / 895.2,      wbDate: "2023-01-12" },
+  { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "2024-01-04" }
 ];
 // APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
-const APP_BUILD = "20261110185123";
-const DATA_UPDATED = "2026-10-26";
+const APP_BUILD = "20261110204247";
+const DATA_UPDATED = "2026-11-10";
 const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
 const RETIRED_IDS = ["R44II-EX"]; // the old R44 II POH example
@@ -1425,6 +1430,32 @@ PERF.R22B = {
   vne: PERF.R22.vne
 };
 
+/* ---------- height-velocity diagrams (POH Section 5) ----------
+   Each avoid area is a polygon of [KIAS, feet AGL] points, closed along the 0 KIAS axis. "high" is the larger area
+   (the POH's higher density altitude case), "low" the sea-level case; "strip" is the low-height, high-speed area.
+   Read from: R22 p. 5-11 (all R22 models), R44 p. 5-6, R44 II p. 5-6, R44 Cadet p. 5-6, R66 p. 5-11. */
+(() => {
+  // R44, R44 II and Cadet: the same shape; only the reference conditions and the speed scale differ
+  const r44Bottom = [[50,152],[50,54],[48.5,39],[46.1,26],[42.4,17],[37.6,13],[29.1,11],[17,10.5],[0,10]];
+  const r44 = (high, low, xMax) => ({ xMax, high: { label: high, pts: [[0,600], ...r44Bottom] }, low: { label: low, pts: [[0,400], ...r44Bottom] },
+    strip: [[45,0],[55,20],[xMax,20],[xMax,0]] });
+  PERF.R22.hv = PERF.R22B.hv = {
+    xMax: 100,
+    high: { label: "7,000 ft density altitude at 1,300 lb", da: 7000,
+      pts: [[0,700],[44,372],[60,253],[60,190],[59.3,150],[58.5,118],[57.3,85],[54.9,57],[51,33],[46.2,21],[39.9,15],[29.6,12],[19.4,11],[0,10]] },
+    low: { label: "Sea level at 1,370 lb", pts: [[0,400],[52.2,202],[52.2,110],[51.8,85],[50.2,61],[47.8,41],[43.9,26],[38.3,18],[30.4,13],[25.7,12],[0,10]] },
+    strip: [[50,0],[60,22],[100,31],[100,0]] };
+  PERF.R44.hv = { ...r44("7,000 ft density altitude at 2,100 lb", "Sea level at 2,400 lb", 130) }; PERF.R44.hv.high.da = 7000;
+  PERF.R44II.hv = { ...r44("8,500 ft density altitude at 2,250 lb", "Sea level at 2,500 lb", 130) }; PERF.R44II.hv.high.da = 8500;
+  PERF.R44C.hv = { ...r44("7,000 ft density altitude at 2,100 lb", "Sea level at 2,200 lb", 120) }; PERF.R44C.hv.high.da = 7000;
+  const r66Bottom = [[55,150],[54.6,126],[53.8,101],[52,77],[49.5,52],[45.9,31],[40.4,17],[27.7,13],[15.5,10],[0,8]];
+  PERF.R66.hv = { xMax: 130,
+    high: { label: "7,800 ft density altitude", da: 7800, pts: [[0,700], ...r66Bottom] },
+    low: { label: "Sea level", pts: [[0,500], ...r66Bottom] },
+    strip: [[45,0],[55,19],[130,19],[130,0]],
+    note: "R66 diagram: 2,700 lb, hover power + 10% torque for takeoff." };
+})();
+
 /* ---------- performance calculations ---------- */
 const PI = Object.assign({ mode: "pa", pa: "", elev: "", alt: "", oat: "", wt: "", anti: false, heat: false, amps: 50, wind: false, chart: "ige" }, store.get("perf", {}));
 let PR = null; // latest performance result, also used by the PDF and printout
@@ -1646,6 +1677,12 @@ function drawLines(ctx, W, H, o, P) {
   ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(o.xLabel, (X(x0) + X(x1)) / 2, H - 2);
   ctx.save(); ctx.translate(12, (Y(y0) + Y(y1)) / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "middle"; ctx.fillText(o.yLabel, 0, 0); ctx.restore();
   ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b); ctx.clip();
+  // shaded areas (the H-V diagram's avoid areas), drawn under the lines
+  (o.fills || []).forEach(f => {
+    ctx.beginPath(); f.pts.forEach(([a, b], i) => i ? ctx.lineTo(X(a), Y(b)) : ctx.moveTo(X(a), Y(b))); ctx.closePath();
+    ctx.globalAlpha = f.alpha; ctx.fillStyle = f.color; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = f.color; ctx.lineWidth = f.lw || 2; ctx.stroke();
+  });
   if (o.vline != null) { ctx.setLineDash([5, 4]); ctx.strokeStyle = P.muted; ctx.beginPath(); ctx.moveTo(X(o.vline), Y(y0)); ctx.lineTo(X(o.vline), Y(y1)); ctx.stroke(); ctx.setLineDash([]); }
   o.lines.forEach(l => {
     ctx.strokeStyle = l.hi ? P.env : P.muted; ctx.globalAlpha = l.hi ? 1 : 0.55; ctx.lineWidth = l.hi ? 2.5 : 1.5;
@@ -1662,6 +1699,13 @@ function drawLines(ctx, W, H, o, P) {
     ctx.textAlign = l.labelAt ? "left" : "right";
     if (used.some(([ux, uy]) => Math.abs(ux - tx) < 26 && Math.abs(uy - ty) < 12)) return;
     used.push([tx, ty]); ctx.fillText(l.label, Math.max(tx, l.labelAt ? 0 : pad.l + 24), ty);
+  });
+  // text placed at data coordinates, with a backing so it reads over the shading
+  (o.texts || []).forEach(t => {
+    ctx.font = `600 11px ${P.font}`; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    const px = X(t.x), py = Y(t.y), w = ctx.measureText(t.text).width;
+    ctx.fillStyle = P.bg; ctx.globalAlpha = 0.85; ctx.fillRect(px - 3, py - 8, w + 6, 16); ctx.globalAlpha = 1;
+    ctx.fillStyle = t.color || P.ink; ctx.fillText(t.text, px, py);
   });
   (o.marks || []).forEach(mk => {
     const c = mk.ok ? P.ok : P.bad, px = X(Math.min(Math.max(mk.x, x0), x1)), py = Y(Math.min(Math.max(mk.y, y0), y1));
@@ -1699,6 +1743,27 @@ function climbChartOpts() {
   if (PR && PR.ready) { const r = climbAt(c, set, PR.pa, PR.oat); if (r.v != null) o.marks.push({ x: r.v, y: PR.pa, ok: true, label: "Your conditions" }); }
   return o;
 }
+function hvChartOpts(P) {
+  const hv = PERF[ac().model].hv;
+  return { x: [0, hv.xMax, 10], y: [0, 700, 50], xLabel: "Indicated airspeed (KIAS)", yLabel: "Height above ground (ft)", lines: [],
+    fills: [{ pts: hv.high.pts, color: P.bad, alpha: 0.12 }, { pts: hv.low.pts, color: P.bad, alpha: 0.3 }, { pts: hv.strip, color: P.bad, alpha: 0.3 }],
+    texts: [{ x: hv.high.pts[1][0] * 0.42 + 3, y: hv.high.pts[0][1] * 0.9 + 25, text: "A: " + hv.high.label.replace(" density altitude", " DA") },
+            { x: 2, y: hv.low.pts[0][1] * 0.55, text: "B: " + hv.low.label }] };
+}
+// which area applies, from the density altitude and weight on this page
+function hvNote() {
+  const hv = PERF[ac().model].hv, parts = [`A (lighter): ${hv.high.label}. B (darker): ${hv.low.label}.`];
+  // needs only altitude and OAT, not a weight
+  if (PR && Number.isFinite(PR.pa) && Number.isFinite(PR.oat)) {
+    const da = Math.round(densityAlt(PR.pa, PR.oat));
+    parts.push(da <= 0 ? `At ${da.toLocaleString()} ft density altitude, area B applies.`
+      : da <= hv.high.da ? `At ${da.toLocaleString()} ft density altitude you are between B and A: plan on the larger area A.`
+      : `At ${da.toLocaleString()} ft density altitude you are above the conditions of area A: expect an avoid area larger than shown.`);
+  }
+  if (hv.note) parts.push(hv.note);
+  parts.push("The low strip on the right is the low-height, high-speed area.");
+  return parts.join(" ");
+}
 function paintPerfCharts() {
   if ($("viewPerf").hidden) return;
   const paint = (cv, o) => { const dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 500, H = cv.clientHeight || 400; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
@@ -1706,6 +1771,7 @@ function paintPerfCharts() {
   paint($("chartHover"), hoverChartOpts(PI.chart));
   $("pChartNote").textContent = PI.chart === "ige" ? "In ground effect, 2 ft skid height. Bold line = your OAT; dashed line = max gross weight." : "Out of ground effect. Bold line = your OAT; dashed line = max gross weight.";
   if (!$("pClimbBox").hidden) paint($("chartClimb"), climbChartOpts());
+  paint($("chartHV"), hvChartOpts(palette(false))); $("pHVNote").textContent = hvNote();
 }
 // text lines for the PDF and printout
 function perfSummary() {
