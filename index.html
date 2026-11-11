@@ -205,6 +205,11 @@ tr.total td{font-weight:700;border-top:2px solid var(--ink);background:var(--fie
 details summary{cursor:pointer;font:600 1.05rem var(--display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);list-style-position:inside}
 .foot{color:var(--muted);font-size:.78rem;margin-top:18px;max-width:75ch}
 details.panel>summary{list-style-position:inside}
+/* pass/fail count on the Limit checks header, readable while it is collapsed */
+.sumtag{font:600 .75rem var(--body);text-transform:none;letter-spacing:0;padding:2px 8px;border-radius:999px;margin-left:6px;vertical-align:2px}
+.sumtag.ok{background:var(--ok-bg);color:var(--ok)}
+.sumtag.bad{background:var(--bad-bg);color:var(--bad)}
+.sumtag.warn{border:1px solid var(--warn);color:var(--warn)}
 
 /* phones: Send/Print stay reachable at the bottom of the screen */
 /* page switch and performance view */
@@ -244,6 +249,21 @@ details.panel>summary{list-style-position:inside}
   .sendbar .msg{min-height:0;font-size:.8rem}
   .send-panel .actions{display:none}
   .wrap{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  /* one column on a phone: occupants, fuel, removed items, long. CG, lat. CG, loading summary, limit checks,
+     passenger manifest, flight details, send.
+     Left column: occupants, fuel, removed items, flight details, manifest. Right column: long. CG, lat. CG,
+     limit checks, loading summary, send. */
+  #viewWB .grid > .col{display:contents}
+  #viewWB .grid > .col:first-child > :nth-child(1){order:1}
+  #viewWB .grid > .col:first-child > :nth-child(2){order:2}
+  #viewWB .grid > .col:first-child > :nth-child(3){order:3}
+  #viewWB .grid > .col:last-child > :nth-child(1){order:4}
+  #viewWB .grid > .col:last-child > :nth-child(2){order:5}
+  #viewWB .grid > .col:last-child > :nth-child(4){order:6}
+  #viewWB .grid > .col:last-child > :nth-child(3){order:7}
+  #viewWB .grid > .col:first-child > :nth-child(5){order:8}
+  #viewWB .grid > .col:first-child > :nth-child(4){order:9}
+  #viewWB .grid > .col:last-child > :nth-child(5){order:10}
 }
 
 /* printing shows only the report built into #printReport, laid out like the PDF */
@@ -382,11 +402,11 @@ details.panel>summary{list-style-position:inside}
         <div class="panel-h"><h2>Lateral CG envelope</h2><span class="hint">+ = right side</span></div>
         <canvas class="chart lat" id="chartLat" role="img" aria-label="Lateral CG versus longitudinal CG chart"></canvas>
       </section>
-      <section class="panel">
-        <h2>Limit checks</h2>
-        <div class="fixes" id="fixes" hidden><h3>How to fix</h3><ul id="fixList"></ul></div>
-        <ul class="checks" id="checks"></ul>
-      </section>
+      <details class="panel" id="checksBox">
+        <summary>Limit checks <span class="sumtag" id="checksTag"></span></summary>
+        <div class="fixes" id="fixes" hidden style="margin-top:12px"><h3>How to fix</h3><ul id="fixList"></ul></div>
+        <ul class="checks" id="checks" style="margin-top:12px"></ul>
+      </details>
       <details class="panel" id="tableBox">
         <summary>Loading summary</summary>
         <div class="tbl-wrap"><table id="table"></table></div>
@@ -661,7 +681,7 @@ const BUILTIN_FLEET = [
   { id: "N931QA", tail: "N931QA", model: "R44", bew: 1463.2, arm: 154590.2 / 1463.2, lat: -164.9 / 1463.2, wbDate: "" }
 ];
 // APP_BUILD is stamped by build-site.ps1; DATA_UPDATED changes whenever BUILTIN_FLEET values change.
-const APP_BUILD = "20261110120300";
+const APP_BUILD = "20261110185123";
 const DATA_UPDATED = "2026-10-26";
 const RESERVE_MIN = 20; // landing point: minutes of fuel remaining
 const isBuiltin = id => BUILTIN_FLEET.some(b => b.id === id);
@@ -1130,6 +1150,9 @@ function update() {
     el.textContent = w > m.seatMax ? `${fmt(w, 0)} lb on this seat; max ${m.seatMax} lb incl. baggage` : "";
   });
   updateManifestWeights();
+  const nBad = R.checks.filter(c => !c.ok && !c.warn).length, nWarn = R.checks.filter(c => c.warn).length, tag = $("checksTag");
+  tag.className = "sumtag " + (R.incomplete ? "warn" : nBad ? "bad" : nWarn ? "warn" : "ok");
+  tag.textContent = R.incomplete ? "Needs pilot weight" : nBad ? `${nBad} failed` : nWarn ? `All limits OK · ${nWarn} warning${nWarn > 1 ? "s" : ""}` : "All OK";
   $("checks").innerHTML = R.checks.map(c => `<li class="${c.ok ? "" : c.warn ? "warn" : "bad"}"><span>${esc(c.text)}</span></li>`).join("");
   const tr = (r, cls = "") => `<tr class="${cls}"><td>${esc(r.label)}</td><td>${fmt(r.w)}</td><td>${fmt(r.arm, 2)}</td><td>${fmt(r.lat, 2)}</td><td>${fmt(r.lm, 0)}</td><td>${fmt(r.tm, 0)}</td></tr>`;
   const tot = (label, t) => tr({ label, w: t.w, arm: t.cg, lat: t.lcg, lm: t.lm, tm: t.tm }, "total");
@@ -1145,7 +1168,8 @@ const fmtDate = d => { const t = new Date(d + "T12:00:00"); return isNaN(t) ? d 
 $("versionLine").textContent = `Version ${APP_BUILD === "dev" ? "preview" : APP_BUILD.replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2}).*/, "$1-$2-$3 $4:$5")}`
   + ` · Built-in aircraft data updated ${fmtDate(DATA_UPDATED)}`;
 // the loading table is long on a phone; open it by default only on wider screens
-if (window.matchMedia("(min-width: 881px)").matches) $("tableBox").open = true;
+// the same for the limit checks: open beside the charts on wide screens, collapsed on a phone
+if (window.matchMedia("(min-width: 881px)").matches) { $("tableBox").open = true; $("checksBox").open = true; }
 let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(update, 120); });
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", update);
 new MutationObserver(update).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
